@@ -1,29 +1,34 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Register from '../views/Register.vue'
+import Register from '../views/register.vue'
 import Session from '../views/Session.vue'
 import Home from '../views/Home.vue'
+import CrearFinca from '../views/CrearFinca.vue' // 👈 Importa el componente de crear finca
 
 const routes = [
   {
     path: '/register',
-    name: 'Register',  // Cambié 'register' por 'Register' (solo la primera letra mayúscula)
+    name: 'Register',
     component: Register
   },
   {
-    path: '/Session',
-    name: 'Session',  // 'Session' ya estaba con la primera letra mayúscula
+    path: '/session',
+    name: 'Session',
     component: Session
   },
   {
-    path: '/Home',
-    name: 'Home',  // 'Session' ya estaba con la primera letra mayúscula
+    path: '/home',
+    name: 'Home',
     component: Home
   },
-  // Ruta por defecto, redirige a /register
+  {
+    path: '/fincas/crear',         // 👈 Nueva ruta agregada aquí
+    name: 'CrearFinca',
+    component: CrearFinca
+  },
   {
     path: '/',
     redirect: '/register'
-  },
+  }
 ]
 
 const router = createRouter({

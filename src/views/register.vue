@@ -38,6 +38,7 @@
 
         <!-- Botón de registro -->
         <button type="submit" class="submit-btn">Registrarse</button>
+        
       </form>
 
       <!-- Mensajes de error o éxito -->
@@ -46,7 +47,7 @@
 
       <!-- Enlace a la página de login -->
       <p class="login-link">
-        ¿Ya tienes una cuenta? <a href="/login">Iniciar sesión</a>
+        ¿Ya tienes una cuenta? <a href="/session">Iniciar sesión</a>
       </p>
     </div>
   </div>

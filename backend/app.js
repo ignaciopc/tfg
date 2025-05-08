@@ -11,7 +11,7 @@ app.use(bodyParser.json());
 
 // Rutas
 const authRoutes = require('./routes/auth');
-app.use('/api', authRoutes);
+app.use('/api', authRoutes);  // El prefijo '/api' se aplica aquí
 
 // Iniciar servidor
 app.listen(process.env.PORT, () => {
