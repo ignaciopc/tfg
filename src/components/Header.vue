@@ -117,8 +117,6 @@ export default {
   justify-content: center;
   align-items: center;
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-  position: fixed;
-  /* Fijamos el header en la parte superior */
   top: 20px;
   left: 20px;
   right: 20px;
