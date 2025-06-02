@@ -2,9 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Register from '../views/register.vue'
 import Session from '../views/Session.vue'
 import Home from '../views/Home.vue'
-import CrearFinca from '../views/CrearFinca.vue' 
+import CrearFinca from '../views/CrearFinca.vue'
 import ListarFincas from '../views/ListarFincas.vue'
-
+import MapaInteractivo from '../views/MapaInteractivo.vue';
 
 const routes = [
   {
@@ -26,11 +26,16 @@ const routes = [
     path: '/fincas/crear',         // 👈 Nueva ruta agregada aquí
     name: 'CrearFinca',
     component: CrearFinca
-  }, 
+  },
   {
     path: '/fincas/lista',   // ruta para listar fincas
     name: 'ListarFincas',
     component: ListarFincas
+  },
+  {
+    path: '/fincas/mapa',
+    name: 'MapaInteractivo',
+    component: MapaInteractivo
   },
   {
     path: '/',
