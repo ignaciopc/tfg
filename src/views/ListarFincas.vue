@@ -23,7 +23,11 @@
           <td>{{ finca.usuario_id }}</td>
           <td>{{ formatFecha(finca.fecha_creacion) }}</td>
           <td>{{ finca.municipio || 'N/D' }}</td>
-          <td><button @click="eliminarFinca(finca.id)">Eliminar</button></td>
+          <td>
+            <button @click="eliminarFinca(finca.id)">Eliminar</button>
+           <router-link :to="`/fincas/detalles/${finca.id}`">Examinar</router-link>
+
+          </td>
         </tr>
       </tbody>
     </table>
@@ -36,7 +40,7 @@ import axios from 'axios';
 export default {
   data() {
     return {
-      fincas: []
+      fincas: [],
     };
   },
   methods: {
@@ -46,7 +50,7 @@ export default {
       return date.toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
       });
     },
     async eliminarFinca(id) {
@@ -56,30 +60,34 @@ export default {
         const token = localStorage.getItem('token');
 
         await axios.delete(`http://localhost:3000/api/fincas/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
 
-        this.fincas = this.fincas.filter(f => f.id !== id);
+        this.fincas = this.fincas.filter((f) => f.id !== id);
         alert('Finca eliminada con éxito.');
       } catch (error) {
         console.error('Error al eliminar finca:', error.response?.data || error.message);
         alert('No se pudo eliminar la finca.');
       }
-    }
+    },
+    irADetalles(id) {
+      // Redirige a /fincas/detalles con el id como query param
+      this.$router.push({ path: '/fincas/detalles', query: { id } });
+    },
   },
   async mounted() {
     try {
       const token = localStorage.getItem('token');
 
       const response = await axios.get('http://localhost:3000/api/fincas/lista', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       this.fincas = response.data.fincas;
     } catch (error) {
       console.error('Error al obtener fincas:', error.response?.data || error.message);
     }
-  }
+  },
 };
 </script>
 
@@ -97,5 +105,13 @@ table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button.ml-2 {
+  margin-left: 0.5rem;
 }
 </style>

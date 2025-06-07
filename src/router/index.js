@@ -5,6 +5,7 @@ import Home from '../views/Home.vue'
 import CrearFinca from '../views/CrearFinca.vue'
 import ListarFincas from '../views/ListarFincas.vue'
 import MapaInteractivo from '../views/MapaInteractivo.vue';
+import DetallesFincas from '../views/DetallesFincas.vue';
 
 const routes = [
   {
@@ -31,6 +32,11 @@ const routes = [
     path: '/fincas/lista',   // ruta para listar fincas
     name: 'ListarFincas',
     component: ListarFincas
+  },
+  {
+    path: '/fincas/detalles/:id',
+    name: 'DetallesFinca',
+    component: () => import('../views/DetallesFincas.vue')
   },
   {
     path: '/fincas/mapa',

@@ -89,7 +89,7 @@ router.post('/fincas/crear', async (req, res) => {
   }
 });
 
-// ---------------- LISTAR FINCAS ----------------
+// ---------------- LISTAR FINCAS CON GEOMETRÍA Y DATOS ECONÓMICOS ----------------
 router.get('/fincas/lista', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
@@ -98,44 +98,141 @@ router.get('/fincas/lista', async (req, res) => {
     const decoded = jwt.verify(token, SECRET_KEY);
     const userId = decoded.id;
 
+    // 1) Incluimos los tres campos nuevos en la SELECT
     const result = await pool.query(
-      `SELECT id, nombre, tamano, tipo_cultivo, usuario_id, fecha_creacion,
-              ST_AsGeoJSON(ST_Centroid(ubicacion)) AS centroide_geojson
+      `SELECT
+         id,
+         nombre,
+         tamano,
+         tipo_cultivo,
+         usuario_id,
+         fecha_creacion,
+         objetivo_ingresos,
+         dinero_gastado,
+         dinero_ganado,
+         ST_AsGeoJSON(ST_Centroid(ubicacion)) AS centroide_geojson,
+         ST_AsGeoJSON(ubicacion) AS ubicacion_geojson
        FROM fincas
        WHERE usuario_id = $1`,
       [userId]
     );
 
-    const fincasConMunicipio = await Promise.all(result.rows.map(async finca => {
+    // 2) Mapeamos cada finca para calcular el 'restante' y sacar el municipio
+    const fincas = await Promise.all(result.rows.map(async finca => {
+      // Convertimos el centroide para sacar lat/lon
       const centroide = JSON.parse(finca.centroide_geojson);
-      const lat = centroide.coordinates[1];
-      const lon = centroide.coordinates[0];
+      const [lon, lat] = centroide.coordinates;
 
+      // Calculamos lo que falta para llegar al objetivo
+      const restante = Math.max(
+        finca.objetivo_ingresos - (finca.dinero_gastado + finca.dinero_ganado),
+        0
+      );
+
+      // Obtenemos el municipio (igual que antes)
+      let municipio = 'Desconocido';
       try {
         const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
-          params: {
-            lat,
-            lon,
-            format: 'json',
-            addressdetails: 1
-          }
+          params: { lat, lon, format: 'json', addressdetails: 1 }
         });
-
-        const address = response.data.address;
-        const municipio = address.city || address.town || address.village || address.municipality || 'Desconocido';
-
-        return { ...finca, municipio };
-      } catch (error) {
-        return { ...finca, municipio: 'Desconocido' };
+        const addr = response.data.address;
+        municipio = addr.city || addr.town || addr.village || addr.municipality || municipio;
+      } catch (e) {
+        // dejamos 'Desconocido'
       }
+
+      // 3) Devolvemos todos los datos juntos
+      return {
+        id: finca.id,
+        nombre: finca.nombre,
+        tamano: finca.tamano,
+        tipo_cultivo: finca.tipo_cultivo,
+        fecha_creacion: finca.fecha_creacion,
+        municipio,
+        // datos económicos
+        objetivo_ingresos: finca.objetivo_ingresos,
+        dinero_gastado: finca.dinero_gastado,
+        dinero_ganado: finca.dinero_ganado,
+        restante,
+        // geometría
+        centroide_geojson: finca.centroide_geojson,
+        ubicacion_geojson: finca.ubicacion_geojson
+      };
     }));
 
-    res.status(200).json({ fincas: fincasConMunicipio });
+    res.status(200).json({ fincas });
   } catch (err) {
     console.error('Error al obtener fincas:', err);
     res.status(500).json({ message: 'Error del servidor.' });
   }
 });
+
+
+// ---------------- LISTAR FINCAS CON GEOMETRÍA Y DATOS ECONÓMICOS PARA UNA FINCA UNICA ----------------
+router.get('/fincas/:id', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+    const fincaId = req.params.id;
+
+    const result = await pool.query(
+      `SELECT
+         id,
+         nombre,
+         tamano,
+         tipo_cultivo,
+         usuario_id,
+         fecha_creacion,
+         objetivo_ingresos,
+         dinero_gastado,
+         dinero_ganado,
+         ST_AsGeoJSON(ST_Centroid(ubicacion)) AS centroide_geojson,
+         ST_AsGeoJSON(ubicacion) AS ubicacion_geojson
+       FROM fincas
+       WHERE usuario_id = $1 AND id = $2`,
+      [userId, fincaId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Finca no encontrada.' });
+    }
+
+    const finca = result.rows[0];
+
+    const centroide = JSON.parse(finca.centroide_geojson);
+    const [lon, lat] = centroide.coordinates;
+
+    let municipio = 'Desconocido';
+    try {
+      const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+        params: { lat, lon, format: 'json', addressdetails: 1 }
+      });
+      const addr = response.data.address;
+      municipio = addr.city || addr.town || addr.village || addr.municipality || municipio;
+    } catch (_) { }
+
+    const restante = Math.max(
+      finca.objetivo_ingresos - (finca.dinero_gastado + finca.dinero_ganado),
+      0
+    );
+
+    res.status(200).json({
+      ...finca,
+      municipio,
+      restante
+    });
+
+  } catch (err) {
+    console.error('Error al obtener finca:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+
+
 
 // ---------------- ELIMINAR FINCA ----------------
 router.delete('/fincas/:id', async (req, res) => {
@@ -163,5 +260,38 @@ router.delete('/fincas/:id', async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar finca.' });
   }
 });
+// ---------------- ACTUALIZAR DATOS ECONÓMICOS DE UNA FINCA ----------------
+router.put('/fincas/:id', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' })
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY)
+    const userId = decoded.id
+    const fincaId = req.params.id
+    const { objetivo_ingresos, dinero_gastado, dinero_ganado, trabajadores } = req.body
+
+    const result = await pool.query(
+      `UPDATE fincas
+       SET objetivo_ingresos = $1,
+           dinero_gastado = $2,
+           dinero_ganado = $3,
+           trabajadores = $4
+       WHERE id = $5 AND usuario_id = $6
+       RETURNING *`,
+      [objetivo_ingresos, dinero_gastado, dinero_ganado, trabajadores, fincaId, userId]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Finca no encontrada o no autorizada.' })
+    }
+
+    res.status(200).json({ message: 'Finca actualizada con éxito.', finca: result.rows[0] })
+  } catch (err) {
+    console.error('Error al actualizar finca:', err)
+    res.status(500).json({ message: 'Error al actualizar finca.' })
+  }
+})
+
 
 module.exports = router;
