@@ -1,6 +1,6 @@
 <template>
-  <div class="dashboard">
-    <div class="row">
+  <div class="dashboard container">
+    <div class="row"> 
       <div class="card">Total de fincas</div>
       <div class="card">Producción esperada</div>
       <div class="card">Tareas pendientes</div>

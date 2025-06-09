@@ -293,5 +293,149 @@ router.put('/fincas/:id', async (req, res) => {
   }
 })
 
+// ---------------- OBTENER TRABAJADORES DE UNA FINCA ----------------
+router.get('/fincas/:id/trabajadores', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
 
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+    const fincaId = req.params.id;
+
+    // Validar acceso a la finca
+    const finca = await pool.query('SELECT id FROM fincas WHERE id = $1 AND usuario_id = $2', [fincaId, userId]);
+    if (finca.rows.length === 0) {
+      return res.status(403).json({ message: 'Acceso no autorizado.' });
+    }
+
+    const result = await pool.query('SELECT id, nombre, sueldo FROM trabajadores WHERE finca_id = $1', [fincaId]);
+    res.status(200).json({ trabajadores: result.rows });
+  } catch (err) {
+    console.error('Error al obtener trabajadores:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+// ---------------- GUARDAR (REEMPLAZAR) TRABAJADORES DE UNA FINCA ----------------
+router.post('/fincas/:id/trabajadores', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+    const fincaId = req.params.id;
+    const { trabajadores } = req.body; // array de objetos: { nombre, sueldo }
+
+    // Validar que la finca es del usuario
+    const finca = await pool.query('SELECT id FROM fincas WHERE id = $1 AND usuario_id = $2', [fincaId, userId]);
+    if (finca.rows.length === 0) {
+      return res.status(403).json({ message: 'Acceso no autorizado a esta finca.' });
+    }
+
+    // Insertar nuevos trabajadores sin borrar los anteriores
+    for (const trabajador of trabajadores) {
+      await pool.query(
+        'INSERT INTO trabajadores (nombre, sueldo, finca_id) VALUES ($1, $2, $3)',
+        [trabajador.nombre, trabajador.sueldo, fincaId]
+      );
+    }
+
+    res.status(200).json({ message: 'Trabajadores agregados correctamente.' });
+  } catch (err) {
+    console.error('Error al guardar trabajadores:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+// ---------------- ELIMINAR TRABAJADOR DE UNA FINCA ----------------
+router.delete('/fincas/:fincaId/trabajadores/:trabajadorId', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+    const { fincaId, trabajadorId } = req.params;
+
+    // Validar que la finca es del usuario
+    const finca = await pool.query('SELECT id FROM fincas WHERE id = $1 AND usuario_id = $2', [fincaId, userId]);
+    if (finca.rows.length === 0) {
+      return res.status(403).json({ message: 'Acceso no autorizado a esta finca.' });
+    }
+
+    // Borrar trabajador por ID y finca_id para evitar eliminar trabajador de otra finca
+    const result = await pool.query(
+      'DELETE FROM trabajadores WHERE id = $1 AND finca_id = $2',
+      [trabajadorId, fincaId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Trabajador no encontrado o no pertenece a la finca.' });
+    }
+
+    res.status(200).json({ message: 'Trabajador eliminado correctamente.' });
+  } catch (err) {
+    console.error('Error al eliminar trabajador:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+
+// 📅 Obtener calendario de cultivo para una finca
+router.get('/fincas/:id/calendario', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM calendario_cultivo WHERE finca_id = $1 ORDER BY fecha_inicio ASC',
+      [id]
+    );
+
+    const calendarioFormateado = result.rows.map(etapa => {
+      const opciones = { day: '2-digit', month: 'long', year: 'numeric' };
+
+      const fechaInicioFormateada = new Date(etapa.fecha_inicio).toLocaleDateString('es-ES', opciones);
+      const fechaFinFormateada = new Date(etapa.fecha_fin).toLocaleDateString('es-ES', opciones);
+
+      return {
+        ...etapa,
+        fecha_inicio: fechaInicioFormateada,
+        fecha_fin: fechaFinFormateada,
+      };
+    });
+
+    res.json({ calendario: calendarioFormateado });
+  } catch (error) {
+    console.error('Error al obtener calendario:', error);
+    res.status(500).json({ error: 'Error al obtener calendario' });
+  }
+});
+
+
+
+// 💾 Guardar calendario (reemplaza las etapas anteriores)
+router.post('/fincas/:id/calendario', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { calendario } = req.body
+
+    // Limpiar calendario anterior
+    await pool.query('DELETE FROM calendario_cultivo WHERE finca_id = $1', [id])
+
+    // Insertar nuevas etapas
+    const insertPromises = calendario.map(etapa =>
+      pool.query(
+        'INSERT INTO calendario_cultivo (finca_id, etapa, fecha_inicio, fecha_fin) VALUES ($1, $2, $3, $4)',
+        [id, etapa.etapa, etapa.fecha_inicio, etapa.fecha_fin]
+      )
+    )
+
+    await Promise.all(insertPromises)
+    res.json({ message: 'Calendario guardado correctamente' })
+  } catch (error) {
+    console.error('Error al guardar calendario:', error)
+    res.status(500).json({ error: 'Error al guardar calendario' })
+  }
+})
 module.exports = router;
