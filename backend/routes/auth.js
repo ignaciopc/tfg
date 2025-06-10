@@ -383,7 +383,7 @@ router.delete('/fincas/:fincaId/trabajadores/:trabajadorId', async (req, res) =>
 });
 
 
-// 📅 Obtener calendario de cultivo para una finca
+// GET calendario de cultivo (fechas en formato 'YYYY-MM-DD')
 router.get('/fincas/:id/calendario', async (req, res) => {
   try {
     const { id } = req.params;
@@ -392,18 +392,12 @@ router.get('/fincas/:id/calendario', async (req, res) => {
       [id]
     );
 
-    const calendarioFormateado = result.rows.map(etapa => {
-      const opciones = { day: '2-digit', month: 'long', year: 'numeric' };
-
-      const fechaInicioFormateada = new Date(etapa.fecha_inicio).toLocaleDateString('es-ES', opciones);
-      const fechaFinFormateada = new Date(etapa.fecha_fin).toLocaleDateString('es-ES', opciones);
-
-      return {
-        ...etapa,
-        fecha_inicio: fechaInicioFormateada,
-        fecha_fin: fechaFinFormateada,
-      };
-    });
+    const calendarioFormateado = result.rows.map(etapa => ({
+      ...etapa,
+      // Convierte Date a string 'YYYY-MM-DD' para evitar desfase
+      fecha_inicio: etapa.fecha_inicio.toISOString().split('T')[0],
+      fecha_fin: etapa.fecha_fin.toISOString().split('T')[0],
+    }));
 
     res.json({ calendario: calendarioFormateado });
   } catch (error) {
@@ -412,30 +406,29 @@ router.get('/fincas/:id/calendario', async (req, res) => {
   }
 });
 
-
-
-// 💾 Guardar calendario (reemplaza las etapas anteriores)
+// POST guardar calendario (reemplaza etapas anteriores)
 router.post('/fincas/:id/calendario', async (req, res) => {
   try {
-    const { id } = req.params
-    const { calendario } = req.body
+    const { id } = req.params;
+    const { calendario } = req.body;
 
-    // Limpiar calendario anterior
-    await pool.query('DELETE FROM calendario_cultivo WHERE finca_id = $1', [id])
+    // Borra etapas anteriores para esta finca
+    await pool.query('DELETE FROM calendario_cultivo WHERE finca_id = $1', [id]);
 
-    // Insertar nuevas etapas
+    // Inserta nuevas etapas sin convertir fechas (debe ser string 'YYYY-MM-DD')
     const insertPromises = calendario.map(etapa =>
       pool.query(
         'INSERT INTO calendario_cultivo (finca_id, etapa, fecha_inicio, fecha_fin) VALUES ($1, $2, $3, $4)',
         [id, etapa.etapa, etapa.fecha_inicio, etapa.fecha_fin]
       )
-    )
+    );
 
-    await Promise.all(insertPromises)
-    res.json({ message: 'Calendario guardado correctamente' })
+    await Promise.all(insertPromises);
+    res.json({ message: 'Calendario guardado correctamente' });
   } catch (error) {
-    console.error('Error al guardar calendario:', error)
-    res.status(500).json({ error: 'Error al guardar calendario' })
+    console.error('Error al guardar calendario:', error);
+    res.status(500).json({ error: 'Error al guardar calendario' });
   }
-})
+});
+
 module.exports = router;
