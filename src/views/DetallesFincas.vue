@@ -39,14 +39,8 @@
             <div class="mt-3">
               <label class="form-label">📊 Progreso económico:</label>
               <div class="progress">
-                <div
-                  class="progress-bar bg-success"
-                  role="progressbar"
-                  :style="{ width: progresoGanancia + '%' }"
-                  :aria-valuenow="progresoGanancia"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                >
+                <div class="progress-bar bg-success" role="progressbar" :style="{ width: progresoGanancia + '%' }"
+                  :aria-valuenow="progresoGanancia" aria-valuemin="0" aria-valuemax="100">
                   {{ progresoGanancia.toFixed(1) }}%
                 </div>
               </div>
@@ -59,11 +53,8 @@
           <div class="card-header bg-info text-white fw-bold">👨‍🌾 Trabajadores</div>
           <div class="card-body">
             <ul class="list-group mb-3">
-              <li
-                v-for="(trabajador, index) in trabajadores"
-                :key="trabajador.id || index"
-                class="list-group-item d-flex justify-content-between align-items-center"
-              >
+              <li v-for="(trabajador, index) in trabajadores" :key="trabajador.id || index"
+                class="list-group-item d-flex justify-content-between align-items-center">
                 <div>
                   <strong>{{ trabajador.nombre }}</strong> — ${{ trabajador.sueldo }}
                 </div>
@@ -79,30 +70,25 @@
                 <input v-model="nuevoTrabajador.nombre" type="text" class="form-control" placeholder="Nombre" />
               </div>
               <div class="col">
-                <input v-model.number="nuevoTrabajador.sueldo" type="number" class="form-control" placeholder="Sueldo" />
+                <input v-model.number="nuevoTrabajador.sueldo" type="number" class="form-control"
+                  placeholder="Sueldo" />
               </div>
               <div class="col-auto">
                 <button @click="agregarTrabajador" class="btn btn-success">Añadir</button>
               </div>
             </div>
 
-            <button @click="guardarTrabajadores" class="btn btn-primary">
-              💾 Guardar Trabajadores
-            </button>
+            <button @click="guardarTrabajadores" class="btn btn-primary">💾 Guardar Trabajadores</button>
           </div>
         </div>
 
-        <!-- 🗓️ Calendario de cultivo editable -->
+        <!-- 🗓️ Calendario de cultivo -->
         <div class="card mb-4">
           <div class="card-header bg-warning text-dark fw-bold">🗓️ Calendario de cultivo</div>
           <div class="card-body">
-
             <ul class="list-group list-group-flush mb-3">
-              <li
-                v-for="(etapa, index) in calendario"
-                :key="etapa.id || index"
-                class="list-group-item d-flex justify-content-between align-items-center"
-              >
+              <li v-for="(etapa, index) in calendario" :key="etapa.id || index"
+                class="list-group-item d-flex justify-content-between align-items-center">
                 <div>
                   <strong>{{ etapa.etapa }}:</strong> {{ etapa.fecha_inicio }} hasta {{ etapa.fecha_fin }}
                 </div>
@@ -128,11 +114,60 @@
               </div>
             </div>
 
-            <button @click="guardarCalendario" class="btn btn-primary">
-              💾 Guardar Calendario
-            </button>
+            <button @click="guardarCalendario" class="btn btn-primary">💾 Guardar Calendario</button>
           </div>
         </div>
+
+        <!-- 📋 Tareas -->
+        <!-- 📋 Tareas -->
+        <div class="card mb-4">
+          <div class="card-header bg-secondary text-white fw-bold">📋 Tareas</div>
+          <div class="card-body">
+            <ul class="list-group mb-3">
+              <li v-for="(tarea, index) in tareas" :key="tarea.id || index"
+                class="list-group-item d-flex justify-content-between align-items-center"
+                :class="{ 'list-group-item-success': tarea.completada }">
+                <div>
+                  <strong>{{ tarea.titulo }}</strong><br />
+                  <small>{{ tarea.descripcion }}</small><br />
+                  <small><em>Asignados:</em> {{ tarea.trabajadores || 'Ninguno' }}</small>
+                </div>
+
+                <div class="btn-group btn-group-sm" role="group" aria-label="Acciones tarea">
+                  <button @click="toggleCompletada(tarea)"
+                    :class="tarea.completada ? 'btn btn-success' : 'btn btn-outline-secondary'"
+                    title="Marcar como completada">
+                    ✔️
+                  </button>
+                  <button @click="eliminarTarea(index)" class="btn btn-danger">🗑️</button>
+                </div>
+              </li>
+              <li v-if="tareas.length === 0" class="list-group-item">
+                No hay tareas registradas.
+              </li>
+            </ul>
+
+            <div class="mb-3 row g-2">
+              <div class="col">
+                <input v-model="nuevaTarea.titulo" type="text" class="form-control" placeholder="Título de la tarea" />
+              </div>
+              <div class="col">
+                <input v-model="nuevaTarea.descripcion" type="text" class="form-control" placeholder="Descripción" />
+              </div>
+              <div class="col">
+                <input v-model="nuevaTarea.trabajadores" type="text" class="form-control"
+                  placeholder="Trabajadores (separados por coma)" />
+              </div>
+              <div class="col-auto">
+                <button @click="agregarTarea" class="btn btn-success">➕ Añadir</button>
+              </div>
+            </div>
+
+            <button @click="guardarTareas" class="btn btn-primary">💾 Guardar Tareas</button>
+          </div>
+        </div>
+
+        <!-- Fin de Tareas -->
 
       </div>
     </div>
@@ -147,7 +182,7 @@ const finca = ref({})
 const progresoGanancia = ref(0)
 const route = useRoute()
 
-// Datos Económicos
+// 💰 Datos Económicos
 const calcularProgreso = () => {
   const meta = finca.value.objetivo_ingresos || 0
   const ganado = finca.value.dinero_ganado || 0
@@ -171,7 +206,6 @@ const guardarCambios = async () => {
         dinero_ganado: finca.value.dinero_ganado,
       })
     })
-
     if (!res.ok) throw new Error()
     alert('✅ Cambios guardados')
     calcularProgreso()
@@ -180,7 +214,6 @@ const guardarCambios = async () => {
   }
 }
 
-// Datos de la finca
 const fetchFinca = async () => {
   const id = route.params.id
   const token = localStorage.getItem('token')
@@ -195,7 +228,7 @@ const fetchFinca = async () => {
   }
 }
 
-// 🧑‍🌾 Trabajadores
+// 👨‍🌾 Trabajadores
 const trabajadores = ref([])
 const nuevoTrabajador = ref({ nombre: '', sueldo: 0 })
 
@@ -263,7 +296,7 @@ const guardarTrabajadores = async () => {
   }
 }
 
-// 📅 Calendario de Cultivo
+// 🗓️ Calendario
 const calendario = ref([])
 const nuevaEtapa = ref({ etapa: '', fecha_inicio: '', fecha_fin: '' })
 
@@ -315,9 +348,98 @@ const guardarCalendario = async () => {
   }
 }
 
+// 📋 Tareas
+const tareas = ref([])
+const nuevaTarea = ref({ titulo: '', descripcion: '', trabajadores: '' })
+
+const agregarTarea = () => {
+  if (!nuevaTarea.value.titulo) {
+    return alert('Título requerido')
+  }
+  tareas.value.push({ ...nuevaTarea.value, completada: false })  // agrego completada=false
+  nuevaTarea.value = { titulo: '', descripcion: '', trabajadores: '' }
+}
+
+const eliminarTarea = (index) => {
+  tareas.value.splice(index, 1)
+}
+
+const toggleCompletada = async (tarea) => {
+  const token = localStorage.getItem('token')
+  if (!token) return alert('⚠️ No hay token')
+
+  try {
+    // Cambio el estado localmente
+    tarea.completada = !tarea.completada
+
+    // Actualizo backend (si tienes API para eso)
+    const fincaId = route.params.id
+    if (!tarea.id) {
+      alert('Esta tarea aún no está guardada en el servidor.')
+      return
+    }
+    const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/tareas/${tarea.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ completada: tarea.completada })
+    })
+
+    if (!res.ok) throw new Error()
+
+    alert(`Tarea ${tarea.completada ? 'marcada como completada' : 'marcada como pendiente'}`)
+
+    await fetchTareas()
+  } catch (error) {
+    alert('❌ Error al actualizar estado')
+    tarea.completada = !tarea.completada // revertir en caso de error
+    console.error(error)
+  }
+}
+
+const guardarTareas = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+  try {
+    const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/tareas`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ tareas: tareas.value })
+    })
+    if (!res.ok) throw new Error()
+    alert('✅ Tareas guardadas')
+    await fetchTareas()
+  } catch (e) {
+    console.error(e)
+    alert('❌ Error al guardar tareas')
+  }
+}
+
+const fetchTareas = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+  try {
+    const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/tareas`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const data = await res.json()
+    tareas.value = data.tareas || []
+  } catch (e) {
+    console.error('Error al obtener tareas:', e)
+  }
+}
+
+
 onMounted(async () => {
   await fetchFinca()
   await fetchTrabajadores()
   await fetchCalendario()
+  await fetchTareas()
 })
+
 </script>

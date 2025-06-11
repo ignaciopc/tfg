@@ -431,4 +431,112 @@ router.post('/fincas/:id/calendario', async (req, res) => {
   }
 });
 
+// Obtener tareas de una finca
+router.get('/fincas/:id/tareas', async (req, res) => {
+  const fincaId = req.params.id;
+  console.log('Buscando tareas para finca ID:', fincaId);
+  try {
+    const result = await pool.query(
+      'SELECT * FROM tareas WHERE finca_id = $1 ORDER BY creada_en',
+      [fincaId]
+    );
+    res.json({ tareas: result.rows });
+  } catch (err) {
+    console.error('Error en /fincas/:id/tareas:', err);
+    res.status(500).json({ error: 'Error al obtener tareas' });
+  }
+});
+
+// Guardar (reemplazar) tareas de una finca sin transacciones explícitas
+router.post('/fincas/:id/tareas', async (req, res) => {
+  const fincaId = req.params.id;
+  const { tareas } = req.body;
+
+  try {
+    // Eliminar tareas anteriores
+    await pool.query('DELETE FROM tareas WHERE finca_id = $1', [fincaId]);
+
+    // Insertar nuevas tareas con Promise.all (paralelo)
+    const insertPromises = tareas.map((tarea) =>
+      pool.query(
+        'INSERT INTO tareas (finca_id, titulo, descripcion, trabajadores) VALUES ($1, $2, $3,$4)',
+        [fincaId, tarea.titulo, tarea.descripcion,tarea.trabajadores] 
+      )
+    );
+
+    await Promise.all(insertPromises);
+
+    res.json({ mensaje: 'Tareas actualizadas' });
+  } catch (err) {
+    console.error('Error al guardar tareas:', err);
+    res.status(500).json({ error: 'Error al guardar tareas' });
+  }
+});
+
+router.patch('/fincas/:fincaId/tareas/:tareaId', async (req, res) => {
+  const { fincaId, tareaId } = req.params
+  const { completada } = req.body
+
+  if (typeof completada !== 'boolean') {
+    return res.status(400).json({ error: 'Valor inválido para completada' })
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE tareas SET completada = $1 WHERE id = $2 AND finca_id = $3 RETURNING *',
+      [completada, tareaId, fincaId]
+    )
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada' })
+    }
+    res.json({ tarea: result.rows[0] })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: 'Error al actualizar tarea' })
+  }
+})
+
+router.get('/fincas/lista', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+
+    // Traemos las fincas del usuario
+    const fincasResult = await pool.query(
+      `SELECT
+         id,
+         nombre
+       FROM fincas
+       WHERE usuario_id = $1`,
+      [userId]
+    );
+
+    const fincas = fincasResult.rows;
+
+    // Para cada finca traemos sus tareas
+    const fincasConTareas = await Promise.all(
+      fincas.map(async (finca) => {
+        const tareasResult = await pool.query(
+          'SELECT id, titulo, descripcion, completada FROM tareas WHERE finca_id = $1 ORDER BY creada_en',
+          [finca.id]
+        );
+
+        return {
+          id: finca.id,
+          nombre: finca.nombre,
+          tareas: tareasResult.rows,
+        };
+      })
+    );
+
+    res.status(200).json({ fincas: fincasConTareas });
+  } catch (err) {
+    console.error('Error al obtener fincas con tareas:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
 module.exports = router;

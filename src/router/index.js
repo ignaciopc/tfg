@@ -5,7 +5,7 @@ import Home from '../views/Home.vue'
 import CrearFinca from '../views/CrearFinca.vue'
 import ListarFincas from '../views/ListarFincas.vue'
 import MapaInteractivo from '../views/MapaInteractivo.vue';
-import DetallesFincas from '../views/DetallesFincas.vue';
+import ListaTareas from '../views/ListaTareas.vue'; 
 
 const routes = [
   {
@@ -42,6 +42,11 @@ const routes = [
     path: '/fincas/mapa',
     name: 'MapaInteractivo',
     component: MapaInteractivo
+  },
+  {
+    path: '/tareas/lista',
+    name: 'ListaTareas',
+    component: ListaTareas
   },
   {
     path: '/',
