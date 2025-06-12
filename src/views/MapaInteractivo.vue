@@ -1,5 +1,5 @@
 <template>
-  <div class="map-wrapper">
+  <div class="map-wrapper p-4 container rounded-4">
     <div id="map" class="map-container"></div>
   </div>
 </template>

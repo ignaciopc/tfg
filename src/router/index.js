@@ -6,6 +6,7 @@ import CrearFinca from '../views/CrearFinca.vue'
 import ListarFincas from '../views/ListarFincas.vue'
 import MapaInteractivo from '../views/MapaInteractivo.vue';
 import ListaTareas from '../views/ListaTareas.vue'; 
+import GestionRoles from '../views/GestionRoles.vue'; 
 
 const routes = [
   {
@@ -47,6 +48,11 @@ const routes = [
     path: '/tareas/lista',
     name: 'ListaTareas',
     component: ListaTareas
+  },
+  {
+    path: '/usuarios/roles',
+    name: 'GestionRoles',
+    component: GestionRoles
   },
   {
     path: '/',

@@ -16,11 +16,9 @@
             <ul class="dropdown-menu">
               <li><router-link to="/fincas/lista" class="dropdown-item">Lista de Fincas</router-link></li>
               <li><router-link to="/fincas/mapa" class="dropdown-item">Mapa Interactivo</router-link></li>
-              <li><router-link to="/fincas/detalles" class="dropdown-item">Detalles de la Finca</router-link></li>
-              <li><router-link to="/fincas/informe-financiero" class="dropdown-item">Informe Financiero</router-link></li>
-              <li><router-link to="/fincas/tareas" class="dropdown-item">Tareas Programadas</router-link></li>
+              <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/fincas/informe-financiero" class="dropdown-item">Informe Financiero</router-link></li>
               <li><router-link to="/fincas/historial" class="dropdown-item">Historial de Rendimiento</router-link></li>
-              <li><router-link to="/fincas/crear" class="dropdown-item">Agregar Nueva Finca</router-link></li>
+              <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/fincas/crear" class="dropdown-item">Agregar Nueva Finca</router-link></li>
             </ul>
           </li>
 
@@ -30,33 +28,30 @@
             <ul class="dropdown-menu">
               <li><router-link to="/tareas/lista" class="dropdown-item">Lista de Tareas</router-link></li>
               <li><router-link to="/tareas/calendario" class="dropdown-item">Calendario de Actividades</router-link></li>
-              <li><router-link to="/tareas/proyectos" class="dropdown-item">Proyectos de Mejora</router-link></li>
             </ul>
           </li>
 
           <!-- Finanzas -->
-          <li class="nav-item dropdown" v-if="isAuthenticated">
+          <li class="nav-item dropdown" v-if="isAuthenticated && usuarioActual?.rol !== 'trabajador'">
             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Finanzas</a>
             <ul class="dropdown-menu">
               <li><router-link to="/finanzas/resumen" class="dropdown-item">Resumen de Finanzas</router-link></li>
               <li><router-link to="/finanzas/rentabilidad" class="dropdown-item">Informe de Rentabilidad</router-link></li>
-              <li><router-link to="/finanzas/pagos" class="dropdown-item">Control de Pagos y Facturación</router-link></li>
               <li><router-link to="/finanzas/inventario" class="dropdown-item">Inventario</router-link></li>
             </ul>
           </li>
 
           <!-- Usuarios -->
-          <li class="nav-item dropdown" v-if="isAuthenticated">
+          <li class="nav-item dropdown" v-if="isAuthenticated && usuarioActual?.rol !== 'trabajador'">
             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Usuarios y Roles</a>
             <ul class="dropdown-menu">
               <li><router-link to="/usuarios/lista" class="dropdown-item">Lista de Usuarios</router-link></li>
-              <li><router-link to="/usuarios/roles" class="dropdown-item">Gestión de Roles y Permisos</router-link></li>
-              <li><router-link to="/usuarios/accesos" class="dropdown-item">Control de Accesos</router-link></li>
+              <li><router-link to="/usuarios/roles" class="dropdown-item">Creacion de trabajadores</router-link></li>
             </ul>
           </li>
 
           <!-- Documentos -->
-          <li class="nav-item dropdown" v-if="isAuthenticated">
+          <li class="nav-item dropdown" v-if="isAuthenticated" >
             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Documentos</a>
             <ul class="dropdown-menu">
               <li><router-link to="/documentos/gestion" class="dropdown-item">Gestión de Documentos</router-link></li>
@@ -64,18 +59,8 @@
             </ul>
           </li>
 
-          <!-- Configuración -->
-          <li class="nav-item dropdown" v-if="isAuthenticated">
-            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Configuración</a>
-            <ul class="dropdown-menu">
-              <li><router-link to="/configuracion/cuenta" class="dropdown-item">Ajustes de la Cuenta</router-link></li>
-              <li><router-link to="/configuracion/plataforma" class="dropdown-item">Configuración de la Plataforma</router-link></li>
-              <li><router-link to="/configuracion/integraciones" class="dropdown-item">Integraciones Externas</router-link></li>
-            </ul>
-          </li>
-
           <!-- Reportes -->
-          <li class="nav-item dropdown" v-if="isAuthenticated">
+          <li class="nav-item dropdown" v-if="isAuthenticated && usuarioActual?.rol !== 'trabajador'">
             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Reportes</a>
             <ul class="dropdown-menu">
               <li><router-link to="/reportes/generacion" class="dropdown-item">Generación de Reportes</router-link></li>
@@ -94,22 +79,38 @@
   </header>
 </template>
 
-<script>
-export default {
-  name: 'Header',
-  data() {
-    return {
-      isAuthenticated: false
-    };
-  },
-  created() {
-    this.checkAuthentication();
-  },
-  methods: {
-    checkAuthentication() {
-      const token = localStorage.getItem('token');
-      this.isAuthenticated = !!token;
-    }
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const isAuthenticated = ref(false)
+const usuarioActual = ref(null)
+
+function checkAuthentication() {
+  const token = localStorage.getItem('token')
+  isAuthenticated.value = !!token
+}
+
+async function fetchUsuarioActual() {
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  try {
+    const res = await fetch('http://localhost:3000/api/usuarios/me', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    if (!res.ok) throw new Error('Error al obtener usuario')
+    usuarioActual.value = await res.json()
+  } catch (error) {
+    console.error('Error al obtener usuario actual:', error)
   }
-};
+}
+
+onMounted(async () => {
+  checkAuthentication()
+  if (isAuthenticated.value) {
+    await fetchUsuarioActual()
+  }
+})
 </script>

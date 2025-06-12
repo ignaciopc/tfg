@@ -24,9 +24,9 @@
           <td>{{ formatFecha(finca.fecha_creacion) }}</td>
           <td>{{ finca.municipio || 'N/D' }}</td>
           <td>
-            <button @click="eliminarFinca(finca.id)">Eliminar</button>
-           <router-link :to="`/fincas/detalles/${finca.id}`">Examinar</router-link>
-
+            <!-- Mostrar botón eliminar solo si no es trabajador -->
+            <button v-if="rol !== 'trabajador'" @click="eliminarFinca(finca.id)">Eliminar</button>
+            <router-link :to="`/fincas/detalles/${finca.id}`">Examinar</router-link>
           </td>
         </tr>
       </tbody>
@@ -41,6 +41,7 @@ export default {
   data() {
     return {
       fincas: [],
+      rol: null, // guardamos rol del usuario aquí
     };
   },
   methods: {
@@ -70,22 +71,25 @@ export default {
         alert('No se pudo eliminar la finca.');
       }
     },
-    irADetalles(id) {
-      // Redirige a /fincas/detalles con el id como query param
-      this.$router.push({ path: '/fincas/detalles', query: { id } });
-    },
   },
   async mounted() {
     try {
       const token = localStorage.getItem('token');
 
+      // Obtener fincas
       const response = await axios.get('http://localhost:3000/api/fincas/lista', {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       this.fincas = response.data.fincas;
+
+      // Obtener rol del usuario
+      const userResponse = await axios.get('http://localhost:3000/api/usuarios/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      this.rol = userResponse.data.rol;
+
     } catch (error) {
-      console.error('Error al obtener fincas:', error.response?.data || error.message);
+      console.error('Error al obtener datos:', error.response?.data || error.message);
     }
   },
 };

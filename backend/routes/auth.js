@@ -98,7 +98,20 @@ router.get('/fincas/lista', async (req, res) => {
     const decoded = jwt.verify(token, SECRET_KEY);
     const userId = decoded.id;
 
-    // 1) Incluimos los tres campos nuevos en la SELECT
+    // Obtener rol y jefe_id del usuario para decidir qué fincas mostrar
+    const userResult = await pool.query(
+      'SELECT rol, jefe_id FROM usuarios WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    const { rol, jefe_id } = userResult.rows[0];
+    const ownerId = rol === 'trabajador' ? jefe_id : userId;
+
+    // Obtener fincas según el ownerId calculado
     const result = await pool.query(
       `SELECT
          id,
@@ -114,22 +127,18 @@ router.get('/fincas/lista', async (req, res) => {
          ST_AsGeoJSON(ubicacion) AS ubicacion_geojson
        FROM fincas
        WHERE usuario_id = $1`,
-      [userId]
+      [ownerId]
     );
 
-    // 2) Mapeamos cada finca para calcular el 'restante' y sacar el municipio
     const fincas = await Promise.all(result.rows.map(async finca => {
-      // Convertimos el centroide para sacar lat/lon
       const centroide = JSON.parse(finca.centroide_geojson);
       const [lon, lat] = centroide.coordinates;
 
-      // Calculamos lo que falta para llegar al objetivo
       const restante = Math.max(
         finca.objetivo_ingresos - (finca.dinero_gastado + finca.dinero_ganado),
         0
       );
 
-      // Obtenemos el municipio (igual que antes)
       let municipio = 'Desconocido';
       try {
         const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
@@ -138,23 +147,21 @@ router.get('/fincas/lista', async (req, res) => {
         const addr = response.data.address;
         municipio = addr.city || addr.town || addr.village || addr.municipality || municipio;
       } catch (e) {
-        // dejamos 'Desconocido'
+        // dejamos municipio como 'Desconocido'
       }
 
-      // 3) Devolvemos todos los datos juntos
       return {
         id: finca.id,
         nombre: finca.nombre,
         tamano: finca.tamano,
         tipo_cultivo: finca.tipo_cultivo,
+        usuario_id: finca.usuario_id,
         fecha_creacion: finca.fecha_creacion,
         municipio,
-        // datos económicos
         objetivo_ingresos: finca.objetivo_ingresos,
         dinero_gastado: finca.dinero_gastado,
         dinero_ganado: finca.dinero_ganado,
         restante,
-        // geometría
         centroide_geojson: finca.centroide_geojson,
         ubicacion_geojson: finca.ubicacion_geojson
       };
@@ -167,73 +174,6 @@ router.get('/fincas/lista', async (req, res) => {
   }
 });
 
-
-// ---------------- LISTAR FINCAS CON GEOMETRÍA Y DATOS ECONÓMICOS PARA UNA FINCA UNICA ----------------
-router.get('/fincas/:id', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
-
-  try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    const userId = decoded.id;
-    const fincaId = req.params.id;
-
-    const result = await pool.query(
-      `SELECT
-         id,
-         nombre,
-         tamano,
-         tipo_cultivo,
-         usuario_id,
-         fecha_creacion,
-         objetivo_ingresos,
-         dinero_gastado,
-         dinero_ganado,
-         ST_AsGeoJSON(ST_Centroid(ubicacion)) AS centroide_geojson,
-         ST_AsGeoJSON(ubicacion) AS ubicacion_geojson
-       FROM fincas
-       WHERE usuario_id = $1 AND id = $2`,
-      [userId, fincaId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Finca no encontrada.' });
-    }
-
-    const finca = result.rows[0];
-
-    const centroide = JSON.parse(finca.centroide_geojson);
-    const [lon, lat] = centroide.coordinates;
-
-    let municipio = 'Desconocido';
-    try {
-      const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
-        params: { lat, lon, format: 'json', addressdetails: 1 }
-      });
-      const addr = response.data.address;
-      municipio = addr.city || addr.town || addr.village || addr.municipality || municipio;
-    } catch (_) { }
-
-    const restante = Math.max(
-      finca.objetivo_ingresos - (finca.dinero_gastado + finca.dinero_ganado),
-      0
-    );
-
-    res.status(200).json({
-      ...finca,
-      municipio,
-      restante
-    });
-
-  } catch (err) {
-    console.error('Error al obtener finca:', err);
-    res.status(500).json({ message: 'Error del servidor.' });
-  }
-});
-
-
-
-
 // ---------------- ELIMINAR FINCA ----------------
 router.delete('/fincas/:id', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -244,22 +184,56 @@ router.delete('/fincas/:id', async (req, res) => {
     const userId = decoded.id;
     const fincaId = req.params.id;
 
-    const result = await pool.query(
-      'SELECT * FROM fincas WHERE id = $1 AND usuario_id = $2',
-      [fincaId, userId]
-    );
+    // Obtener rol y jefe_id del usuario
+    const userResult = await pool.query('SELECT rol, jefe_id FROM usuarios WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Finca no encontrada o no autorizada.' });
+    const { rol, jefe_id } = userResult.rows[0];
+
+    // Solo si es jefe se permite eliminar
+    if (rol === 'trabajador') {
+      return res.status(403).json({ message: 'No tienes permisos para eliminar esta finca.' });
     }
 
+    // Verificar que la finca pertenezca al usuario o a su jefe (por seguridad)
+    const fincaResult = await pool.query('SELECT usuario_id FROM fincas WHERE id = $1', [fincaId]);
+    if (fincaResult.rows.length === 0) return res.status(404).json({ message: 'Finca no encontrada.' });
+
+    const fincaUsuarioId = fincaResult.rows[0].usuario_id;
+    if (fincaUsuarioId !== userId) {
+      return res.status(403).json({ message: 'No puedes eliminar fincas que no te pertenecen.' });
+    }
+
+    // Borrar finca
     await pool.query('DELETE FROM fincas WHERE id = $1', [fincaId]);
     res.status(200).json({ message: 'Finca eliminada correctamente.' });
+
   } catch (err) {
     console.error('Error al eliminar finca:', err);
-    res.status(500).json({ message: 'Error al eliminar finca.' });
+    res.status(500).json({ message: 'Error del servidor.' });
   }
 });
+
+// Ejemplo básico en Express para /api/usuarios/me
+router.get('/usuarios/me', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+
+    const userResult = await pool.query('SELECT id, nombre, rol FROM usuarios WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado.' });
+
+    const user = userResult.rows[0];
+    res.json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
 // ---------------- ACTUALIZAR DATOS ECONÓMICOS DE UNA FINCA ----------------
 router.put('/fincas/:id', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1]
@@ -328,8 +302,21 @@ router.post('/fincas/:id/trabajadores', async (req, res) => {
     const fincaId = req.params.id;
     const { trabajadores } = req.body; // array de objetos: { nombre, sueldo }
 
-    // Validar que la finca es del usuario
-    const finca = await pool.query('SELECT id FROM fincas WHERE id = $1 AND usuario_id = $2', [fincaId, userId]);
+    // Obtener rol y jefe_id del usuario
+    const userResult = await pool.query('SELECT rol, jefe_id FROM usuarios WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    const { rol, jefe_id } = userResult.rows[0];
+    const propietarioId = rol === 'trabajador' ? jefe_id : userId;
+
+    // Verificar que la finca pertenece al propietario (jefe o el mismo usuario si no es trabajador)
+    const finca = await pool.query(
+      'SELECT id FROM fincas WHERE id = $1 AND usuario_id = $2',
+      [fincaId, propietarioId]
+    );
+
     if (finca.rows.length === 0) {
       return res.status(403).json({ message: 'Acceso no autorizado a esta finca.' });
     }
@@ -348,6 +335,7 @@ router.post('/fincas/:id/trabajadores', async (req, res) => {
     res.status(500).json({ message: 'Error del servidor.' });
   }
 });
+
 
 // ---------------- ELIMINAR TRABAJADOR DE UNA FINCA ----------------
 router.delete('/fincas/:fincaId/trabajadores/:trabajadorId', async (req, res) => {
@@ -452,15 +440,16 @@ router.post('/fincas/:id/tareas', async (req, res) => {
   const fincaId = req.params.id;
   const { tareas } = req.body;
 
+  console.log('✅ Recibiendo tareas para guardar:', tareas); // 👈 Añade esto
+
   try {
-    // Eliminar tareas anteriores
     await pool.query('DELETE FROM tareas WHERE finca_id = $1', [fincaId]);
 
-    // Insertar nuevas tareas con Promise.all (paralelo)
     const insertPromises = tareas.map((tarea) =>
       pool.query(
-        'INSERT INTO tareas (finca_id, titulo, descripcion, trabajadores) VALUES ($1, $2, $3,$4)',
-        [fincaId, tarea.titulo, tarea.descripcion,tarea.trabajadores] 
+        'INSERT INTO tareas(finca_id, titulo, descripcion, trabajadores, completada) VALUES($1, $2, $3, $4, $5)',
+        [fincaId, tarea.titulo, tarea.descripcion, tarea.trabajadores, tarea.completada || false]
+
       )
     );
 
@@ -468,10 +457,11 @@ router.post('/fincas/:id/tareas', async (req, res) => {
 
     res.json({ mensaje: 'Tareas actualizadas' });
   } catch (err) {
-    console.error('Error al guardar tareas:', err);
+    console.error('❌ Error al guardar tareas:', err); // 👈 Detalle el error real
     res.status(500).json({ error: 'Error al guardar tareas' });
   }
 });
+
 
 router.patch('/fincas/:fincaId/tareas/:tareaId', async (req, res) => {
   const { fincaId, tareaId } = req.params
@@ -496,7 +486,9 @@ router.patch('/fincas/:fincaId/tareas/:tareaId', async (req, res) => {
   }
 })
 
-router.get('/fincas/lista', async (req, res) => {
+
+// Obtener tareas de todas las fincas del usuario autenticado
+router.get('/fincas/tareas-multiples', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
 
@@ -504,39 +496,174 @@ router.get('/fincas/lista', async (req, res) => {
     const decoded = jwt.verify(token, SECRET_KEY);
     const userId = decoded.id;
 
-    // Traemos las fincas del usuario
-    const fincasResult = await pool.query(
-      `SELECT
-         id,
-         nombre
-       FROM fincas
-       WHERE usuario_id = $1`,
+    const tareasResult = await pool.query(
+      `SELECT t.id, t.titulo, t.descripcion, t.trabajadores, t.completada, t.creada_en, t.finca_id, f.nombre as finca_nombre
+       FROM tareas t
+       JOIN fincas f ON t.finca_id = f.id
+       WHERE f.usuario_id = $1
+       ORDER BY t.creada_en DESC`,
       [userId]
     );
 
-    const fincas = fincasResult.rows;
+    const tareas = tareasResult.rows;
 
-    // Para cada finca traemos sus tareas
-    const fincasConTareas = await Promise.all(
-      fincas.map(async (finca) => {
-        const tareasResult = await pool.query(
-          'SELECT id, titulo, descripcion, completada FROM tareas WHERE finca_id = $1 ORDER BY creada_en',
-          [finca.id]
-        );
+    res.status(200).json({ tareas });
+  } catch (err) {
+    console.error('❌ Error al obtener tareas del usuario:', err);
+    res.status(500).json({ message: 'Error al obtener tareas del usuario.' });
+  }
+});
 
-        return {
-          id: finca.id,
-          nombre: finca.nombre,
-          tareas: tareasResult.rows,
-        };
-      })
+// ---------------- GUARDAR TAREAS ----------------
+
+router.post('/fincas/tareas-multiples/guardar', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+
+    const tareas = req.body.tareas; // array de tareas que envías desde el frontend
+
+    for (const tarea of tareas) {
+      // Ejemplo: insertar tarea (ajusta según estructura de tu tabla)
+      await pool.query(
+        `INSERT INTO tareas (id, titulo, descripcion, completada, finca_id)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE SET
+           titulo = EXCLUDED.titulo,
+           descripcion = EXCLUDED.descripcion,
+           completada = EXCLUDED.completada,
+           finca_id = EXCLUDED.finca_id`,
+        [tarea.id, tarea.titulo, tarea.descripcion, tarea.completada, tarea.finca_id]
+      );
+    }
+
+    res.status(200).json({ message: 'Tareas guardadas correctamente.' });
+  } catch (err) {
+    console.error('Error guardando tareas:', err);
+    res.status(500).json({ message: 'Error al guardar tareas.' });
+  }
+});
+
+// Ruta para que un consultor cree trabajadores
+router.post('/register-trabajador', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const jefeId = decoded.id; // este será el jefe_id del trabajador
+
+    const { username, email, telefono, password } = req.body;
+
+    // Verificar si el correo ya existe
+    const userExists = await pool.query('SELECT * FROM usuarios WHERE correo = $1', [email]);
+    if (userExists.rows.length > 0) {
+      return res.status(400).json({ message: 'El correo ya está registrado.' });
+    }
+
+    // Encriptar contraseña
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insertar nuevo trabajador con el jefe_id
+    await pool.query(
+      `INSERT INTO usuarios (nombre, correo, telefono, contraseña, rol, jefe_id)
+       VALUES ($1, $2, $3, $4, 'trabajador', $5)`,
+      [username, email, telefono, hashedPassword, jefeId]
     );
 
-    res.status(200).json({ fincas: fincasConTareas });
+    res.status(201).json({ message: 'Trabajador registrado con éxito.' });
+
   } catch (err) {
-    console.error('Error al obtener fincas con tareas:', err);
+    console.error('Error al registrar trabajador:', err);
     res.status(500).json({ message: 'Error del servidor.' });
   }
 });
+
+
+// ---------------- LISTAR FINCAS CON GEOMETRÍA Y DATOS ECONÓMICOS PARA UNA FINCA UNICA ----------------
+router.get('/fincas/:id', async (req, res) => {
+  console.log('Hola desde la ruta de una finca única');
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+    const fincaId = req.params.id;
+    console.log(userId);
+
+    // Obtener el rol y jefe_id del usuario
+    const userResult = await pool.query(
+      'SELECT rol, jefe_id FROM usuarios WHERE id = $1',
+      [userId]
+    );
+    console.log(userResult);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    const { rol, jefe_id } = userResult.rows[0];
+    const ownerId = rol === 'trabajador' ? jefe_id : userId;
+
+    // Buscar la finca que pertenezca al jefe o al usuario
+    const result = await pool.query(
+      `SELECT
+         id,
+         nombre,
+         tamano,
+         tipo_cultivo,
+         usuario_id,
+         fecha_creacion,
+         objetivo_ingresos,
+         dinero_gastado,
+         dinero_ganado,
+         ST_AsGeoJSON(ST_Centroid(ubicacion)) AS centroide_geojson,
+         ST_AsGeoJSON(ubicacion) AS ubicacion_geojson
+       FROM fincas
+       WHERE usuario_id = $1 AND id = $2`,
+      [ownerId, fincaId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Finca no encontrada.' });
+    }
+
+    const finca = result.rows[0];
+
+    const centroide = JSON.parse(finca.centroide_geojson);
+    const [lon, lat] = centroide.coordinates;
+
+    let municipio = 'Desconocido';
+    try {
+      const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+        params: { lat, lon, format: 'json', addressdetails: 1 }
+      });
+      const addr = response.data.address;
+      municipio = addr.city || addr.town || addr.village || addr.municipality || municipio;
+    } catch (_) { }
+
+    const restante = Math.max(
+      finca.objetivo_ingresos - (finca.dinero_gastado + finca.dinero_ganado),
+      0
+    );
+
+    res.status(200).json({
+      ...finca,
+      municipio,
+      restante
+    });
+
+  } catch (err) {
+    console.error('Error al obtener finca:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+
+
 
 module.exports = router;

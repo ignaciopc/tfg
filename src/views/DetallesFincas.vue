@@ -16,7 +16,7 @@
         </div>
 
         <!-- 💰 Sección Económica -->
-        <div class="card mb-4">
+        <div class="card mb-4" v-if="usuarioActual?.rol !== 'trabajador'">
           <div class="card-header bg-success text-white fw-bold">💰 Sección Económica</div>
           <div class="card-body">
             <div class="mb-3">
@@ -49,7 +49,7 @@
         </div>
 
         <!-- 👨‍🌾 Trabajadores -->
-        <div class="card mb-4">
+        <div class="card mb-4" v-if="usuarioActual?.rol !== 'trabajador'">
           <div class="card-header bg-info text-white fw-bold">👨‍🌾 Trabajadores</div>
           <div class="card-body">
             <ul class="list-group mb-3">
@@ -118,7 +118,6 @@
           </div>
         </div>
 
-        <!-- 📋 Tareas -->
         <!-- 📋 Tareas -->
         <div class="card mb-4">
           <div class="card-header bg-secondary text-white fw-bold">📋 Tareas</div>
@@ -434,12 +433,32 @@ const fetchTareas = async () => {
   }
 }
 
+const usuarioActual = ref(null)
+const fetchUsuarioActual = async () => {
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  try {
+    const res = await fetch('http://localhost:3000/api/usuarios/me', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    if (!res.ok) throw new Error('Error al obtener usuario')
+    usuarioActual.value = await res.json()
+  } catch (error) {
+    console.error('Error al obtener usuario actual:', error)
+  }
+}
+
 
 onMounted(async () => {
   await fetchFinca()
   await fetchTrabajadores()
   await fetchCalendario()
   await fetchTareas()
+  await fetchUsuarioActual()
+
 })
 
 </script>

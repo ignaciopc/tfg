@@ -2,8 +2,10 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+
 const fincasRouter = require('./routes/fincas');
 const authRoutes = require('./routes/auth');
+const usuariosRouter = require('./routes/usuarios'); // <-- Importa el router de usuarios
 
 require('dotenv').config();
 
@@ -22,6 +24,7 @@ app.use(bodyParser.json()); // También puedes usar app.use(express.json())
 // Rutas
 app.use('/api', authRoutes);
 app.use('/api/fincas', fincasRouter);
+app.use('/api/usuarios', usuariosRouter); // <-- Usa el router para usuarios con prefijo /api/usuarios
 
 // Manejo básico de rutas no encontradas
 app.use((req, res) => {
