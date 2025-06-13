@@ -26,6 +26,27 @@
             <div class="mb-3">
               <label class="form-label">Dinero gastado:</label>
               <input v-model.number="finca.dinero_gastado" type="number" class="form-control" />
+              <!-- 📑 Gastos Detallados -->
+              <div class="mb-3">
+                <label class="form-label">📑 Gastos detallados:</label>
+                <ul class="list-group mb-2">
+                  <li v-for="(gasto, index) in gastos" :key="index"
+                    class="list-group-item d-flex justify-content-between">
+                    <div>
+                      <strong>{{ gasto.descripcion }}</strong>: ${{ gasto.cantidad }}
+                    </div>
+                  </li>
+                  <li v-if="gastos.length === 0" class="list-group-item">No hay gastos registrados.</li>
+                </ul>
+
+                <div class="input-group">
+                  <input v-model="nuevoGasto.descripcion" type="text" class="form-control" placeholder="Descripción" />
+                  <input v-model.number="nuevoGasto.cantidad" type="number" class="form-control"
+                    placeholder="Cantidad" />
+                  <button class="btn btn-outline-success" @click="agregarGasto">➕ Añadir gasto</button>
+                </div>
+              </div>
+
             </div>
             <div class="mb-3">
               <label class="form-label">Dinero ganado:</label>
@@ -35,13 +56,13 @@
             <button @click="guardarCambios" class="btn btn-sm btn-primary">💾 Guardar todos los cambios</button>
 
             <p class="mt-3"><strong>Ganancia estimada:</strong> ${{ finca.dinero_ganado - finca.dinero_gastado }}</p>
-
             <div class="mt-3">
-              <label class="form-label">📊 Progreso económico:</label>
+              <label class="form-label">📊 Progreso económico</label>
               <div class="progress">
-                <div class="progress-bar bg-success" role="progressbar" :style="{ width: progresoGanancia + '%' }"
-                  :aria-valuenow="progresoGanancia" aria-valuemin="0" aria-valuemax="100">
-                  {{ progresoGanancia.toFixed(1) }}%
+                <div class="progress-bar" :class="barraColor" role="progressbar"
+                  :style="{ width: progresoGananciaReal + '%' }" :aria-valuenow="progresoGananciaReal" aria-valuemin="0"
+                  aria-valuemax="100">
+                  {{ progresoGananciaReal.toFixed(1) }}%
                 </div>
               </div>
             </div>
@@ -193,6 +214,7 @@ const guardarCambios = async () => {
   if (!token) return alert('⚠️ No hay token')
 
   try {
+    finca.value.dinero_gastado = totalGastos.value  // 💡 forzamos actualización
     const res = await fetch(`http://localhost:3000/api/fincas/${finca.value.id}`, {
       method: 'PUT',
       headers: {
@@ -212,6 +234,7 @@ const guardarCambios = async () => {
     alert('❌ Error al guardar')
   }
 }
+
 
 const fetchFinca = async () => {
   const id = route.params.id
@@ -450,15 +473,100 @@ const fetchUsuarioActual = async () => {
     console.error('Error al obtener usuario actual:', error)
   }
 }
+const gastos = ref([])
+const nuevoGasto = ref({ descripcion: '', cantidad: 0 })
 
+const fetchGastos = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token') // ⚠️ Asegúrate de haber guardado el token al iniciar sesión
+
+  try {
+    const res = await fetch(`http://localhost:3000/api/gastos/${fincaId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    if (!res.ok) throw new Error('Error al obtener gastos')
+
+    const data = await res.json()
+    gastos.value = data || []
+  } catch (e) {
+    console.error('Error al obtener gastos:', e)
+  }
+}
+
+
+
+const agregarGasto = async () => {
+  const fincaId = route.params.id
+  const { descripcion, cantidad } = nuevoGasto.value
+  const token = localStorage.getItem('token')
+
+  if (!descripcion || cantidad <= 0) return alert('Datos del gasto inválidos')
+
+  try {
+    const res = await fetch('http://localhost:3000/api/gastos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ finca_id: fincaId, descripcion, cantidad })
+    })
+
+    if (!res.ok) throw new Error('Error al agregar gasto')
+
+    alert('✅ Gasto registrado')
+    nuevoGasto.value = { descripcion: '', cantidad: 0 }
+    await fetchGastos()
+    await actualizarDineroGastado()
+
+  } catch (e) {
+    console.error(e)
+    alert('❌ No se pudo registrar el gasto')
+  }
+}
+
+
+
+const actualizarDineroGastado = async () => {
+  finca.value.dinero_gastado = gastos.value.reduce((total, g) => total + Number(g.cantidad), 0)
+  calcularProgreso()
+}
+
+import { computed } from 'vue'
+
+const totalGastos = computed(() =>
+  gastos.value.reduce((total, gasto) => total + (parseFloat(gasto.cantidad) || 0), 0)
+)
+
+const progresoGananciaReal = computed(() => {
+  const ganado = finca.value.dinero_ganado || 0
+  const gastado = finca.value.dinero_gastado || 0
+  const objetivo = finca.value.objetivo_ingresos || 0
+
+  const gananciaNeta = ganado - gastado
+  if (objetivo === 0) return 0
+
+  return Math.max(0, Math.min(100, (gananciaNeta / objetivo) * 100))
+})
+
+const barraColor = computed(() => {
+  return finca.value.dinero_gastado > finca.value.dinero_ganado
+    ? 'bg-danger' // rojo si hay pérdida
+    : 'bg-success' // verde si va bien
+})
 
 onMounted(async () => {
   await fetchFinca()
   await fetchTrabajadores()
   await fetchCalendario()
   await fetchTareas()
+  await fetchGastos()             // <--- NUEVO
   await fetchUsuarioActual()
-
+  await actualizarDineroGastado() // <--- NUEVO
 })
+
 
 </script>

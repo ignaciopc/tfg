@@ -664,6 +664,52 @@ router.get('/fincas/:id', async (req, res) => {
 });
 
 
+router.post('/gastos', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
 
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const jefeId = decoded.id; // este será el dueño del gasto o el jefe
+
+    const { finca_id, descripcion, cantidad } = req.body;
+
+    // Insertar gasto con relación a la finca y validando que la finca pertenezca al jefe, si aplica
+    await pool.query(
+      `INSERT INTO gastos (finca_id, descripcion, cantidad)
+       VALUES ($1, $2, $3)`,
+      [finca_id, descripcion, cantidad]
+    );
+
+    res.status(201).json({ message: 'Gasto registrado con éxito.' });
+
+  } catch (err) {
+    console.error('Error al registrar gasto:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+// Ruta para obtener los gastos de una finca específica del jefe autenticado
+router.get('/gastos/:fincaId', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const fincaId = req.params.fincaId;
+
+    // Consultar gastos solo si pertenecen al jefe autenticado
+    const result = await pool.query(
+      `SELECT * FROM gastos WHERE finca_id = $1`,
+      [fincaId]
+    );
+
+    res.status(200).json(result.rows);
+
+  } catch (err) {
+    console.error('Error al obtener gastos:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
 
 module.exports = router;

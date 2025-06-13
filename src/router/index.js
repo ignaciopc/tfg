@@ -22,37 +22,44 @@ const routes = [
   {
     path: '/home',
     name: 'Home',
-    component: Home
+    component: Home,
+    meta: { requiresAuth: true }
   },
   {
-    path: '/fincas/crear',         // 👈 Nueva ruta agregada aquí
+    path: '/fincas/crear',
     name: 'CrearFinca',
-    component: CrearFinca
+    component: CrearFinca,
+    meta: { requiresAuth: true }
   },
   {
-    path: '/fincas/lista',   // ruta para listar fincas
+    path: '/fincas/lista',
     name: 'ListarFincas',
-    component: ListarFincas
+    component: ListarFincas,
+    meta: { requiresAuth: true }
   },
   {
     path: '/fincas/detalles/:id',
     name: 'DetallesFinca',
-    component: () => import('../views/DetallesFincas.vue')
+    component: () => import('../views/DetallesFincas.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/fincas/mapa',
     name: 'MapaInteractivo',
-    component: MapaInteractivo
+    component: MapaInteractivo,
+    meta: { requiresAuth: true }
   },
   {
     path: '/tareas/lista',
     name: 'ListaTareas',
-    component: ListaTareas
+    component: ListaTareas,
+    meta: { requiresAuth: true }
   },
   {
     path: '/usuarios/roles',
     name: 'GestionRoles',
-    component: GestionRoles
+    component: GestionRoles,
+    meta: { requiresAuth: true }
   },
   {
     path: '/',
@@ -63,6 +70,16 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// Guardia global para rutas protegidas
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  if (to.meta.requiresAuth && !token) {
+    next({ name: 'Session' }) // redirige a login si no hay token
+  } else {
+    next()
+  }
 })
 
 export default router

@@ -16,7 +16,6 @@
             <ul class="dropdown-menu">
               <li><router-link to="/fincas/lista" class="dropdown-item">Lista de Fincas</router-link></li>
               <li><router-link to="/fincas/mapa" class="dropdown-item">Mapa Interactivo</router-link></li>
-              <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/fincas/informe-financiero" class="dropdown-item">Informe Financiero</router-link></li>
               <li><router-link to="/fincas/historial" class="dropdown-item">Historial de Rendimiento</router-link></li>
               <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/fincas/crear" class="dropdown-item">Agregar Nueva Finca</router-link></li>
             </ul>
@@ -38,6 +37,8 @@
               <li><router-link to="/finanzas/resumen" class="dropdown-item">Resumen de Finanzas</router-link></li>
               <li><router-link to="/finanzas/rentabilidad" class="dropdown-item">Informe de Rentabilidad</router-link></li>
               <li><router-link to="/finanzas/inventario" class="dropdown-item">Inventario</router-link></li>
+              <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/finanzas/informe-financiero" class="dropdown-item">Informe Financiero</router-link></li>
+
             </ul>
           </li>
 
