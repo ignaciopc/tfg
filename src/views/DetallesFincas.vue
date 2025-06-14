@@ -150,8 +150,11 @@
                 <div>
                   <strong>{{ tarea.titulo }}</strong><br />
                   <small>{{ tarea.descripcion }}</small><br />
-                  <small><em>Asignados:</em> {{ tarea.trabajadores || 'Ninguno' }}</small>
+                  <small><em>Asignados:</em> {{ tarea.trabajadores || 'Ninguno' }}</small><br />
+                  <small><em>Inicio:</em> {{ tarea.fecha_inicio }}</small><br />
+                  <small><em>Fin:</em> {{ tarea.fecha_fin }}</small>
                 </div>
+
 
                 <div class="btn-group btn-group-sm" role="group" aria-label="Acciones tarea">
                   <button @click="toggleCompletada(tarea)"
@@ -177,6 +180,12 @@
               <div class="col">
                 <input v-model="nuevaTarea.trabajadores" type="text" class="form-control"
                   placeholder="Trabajadores (separados por coma)" />
+              </div>
+              <div class="col">
+                <input v-model="nuevaTarea.fecha_inicio" type="date" class="form-control" />
+              </div>
+              <div class="col">
+                <input v-model="nuevaTarea.fecha_fin" type="date" class="form-control" />
               </div>
               <div class="col-auto">
                 <button @click="agregarTarea" class="btn btn-success">➕ Añadir</button>
@@ -372,15 +381,17 @@ const guardarCalendario = async () => {
 
 // 📋 Tareas
 const tareas = ref([])
-const nuevaTarea = ref({ titulo: '', descripcion: '', trabajadores: '' })
+const nuevaTarea = ref({ titulo: '', descripcion: '', trabajadores: '', fecha_inicio: '', fecha_fin: '' })
 
 const agregarTarea = () => {
-  if (!nuevaTarea.value.titulo) {
-    return alert('Título requerido')
-  }
-  tareas.value.push({ ...nuevaTarea.value, completada: false })  // agrego completada=false
-  nuevaTarea.value = { titulo: '', descripcion: '', trabajadores: '' }
+  const { titulo, fecha_inicio, fecha_fin } = nuevaTarea.value
+  if (!titulo) return alert('Título requerido')
+  if (!fecha_inicio || !fecha_fin) return alert('Fecha de inicio y fin son obligatorias')
+
+  tareas.value.push({ ...nuevaTarea.value, completada: false })
+  nuevaTarea.value = { titulo: '', descripcion: '', trabajadores: '', fecha_inicio: '', fecha_fin: '' }
 }
+
 
 const eliminarTarea = (index) => {
   tareas.value.splice(index, 1)

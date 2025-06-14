@@ -7,6 +7,8 @@ import ListarFincas from '../views/ListarFincas.vue'
 import MapaInteractivo from '../views/MapaInteractivo.vue';
 import ListaTareas from '../views/ListaTareas.vue'; 
 import GestionRoles from '../views/GestionRoles.vue'; 
+import CalendarioTareas from '../views/CalendarioTareas.vue'; 
+import ResumenFinanzas from '../views/ResumenFinanzas.vue'; 
 
 const routes = [
   {
@@ -59,6 +61,18 @@ const routes = [
     path: '/usuarios/roles',
     name: 'GestionRoles',
     component: GestionRoles,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/tareas/calendario',
+    name: 'CalendarioTareas',
+    component: CalendarioTareas,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/finanzas/resumen',
+    name: 'ResumenFinanzas',
+    component: ResumenFinanzas,
     meta: { requiresAuth: true }
   },
   {

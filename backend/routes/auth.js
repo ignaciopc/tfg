@@ -440,16 +440,24 @@ router.post('/fincas/:id/tareas', async (req, res) => {
   const fincaId = req.params.id;
   const { tareas } = req.body;
 
-  console.log('✅ Recibiendo tareas para guardar:', tareas); // 👈 Añade esto
+  console.log('✅ Recibiendo tareas para guardar:', tareas);
 
   try {
     await pool.query('DELETE FROM tareas WHERE finca_id = $1', [fincaId]);
 
     const insertPromises = tareas.map((tarea) =>
       pool.query(
-        'INSERT INTO tareas(finca_id, titulo, descripcion, trabajadores, completada) VALUES($1, $2, $3, $4, $5)',
-        [fincaId, tarea.titulo, tarea.descripcion, tarea.trabajadores, tarea.completada || false]
-
+        `INSERT INTO tareas(finca_id, titulo, descripcion, trabajadores, completada, fecha_inicio, fecha_fin)
+         VALUES($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          fincaId,
+          tarea.titulo,
+          tarea.descripcion,
+          tarea.trabajadores,
+          tarea.completada || false,
+          tarea.fecha_inicio || null,
+          tarea.fecha_fin || null,
+        ]
       )
     );
 
@@ -457,10 +465,11 @@ router.post('/fincas/:id/tareas', async (req, res) => {
 
     res.json({ mensaje: 'Tareas actualizadas' });
   } catch (err) {
-    console.error('❌ Error al guardar tareas:', err); // 👈 Detalle el error real
+    console.error('❌ Error al guardar tareas:', err);
     res.status(500).json({ error: 'Error al guardar tareas' });
   }
 });
+
 
 
 router.patch('/fincas/:fincaId/tareas/:tareaId', async (req, res) => {
@@ -497,11 +506,13 @@ router.get('/fincas/tareas-multiples', async (req, res) => {
     const userId = decoded.id;
 
     const tareasResult = await pool.query(
-      `SELECT t.id, t.titulo, t.descripcion, t.trabajadores, t.completada, t.creada_en, t.finca_id, f.nombre as finca_nombre
-       FROM tareas t
-       JOIN fincas f ON t.finca_id = f.id
-       WHERE f.usuario_id = $1
-       ORDER BY t.creada_en DESC`,
+      `SELECT t.id, t.titulo, t.descripcion, t.trabajadores, t.completada, t.creada_en,
+       t.finca_id, f.nombre as finca_nombre, t.fecha_inicio, t.fecha_fin
+FROM tareas t
+JOIN fincas f ON t.finca_id = f.id
+WHERE f.usuario_id = $1
+ORDER BY t.creada_en DESC
+`,
       [userId]
     );
 
@@ -688,6 +699,39 @@ router.post('/gastos', async (req, res) => {
     res.status(500).json({ message: 'Error del servidor.' });
   }
 });
+// Ruta para obtener un resumen de gastos de todas las fincas del usuario autenticado
+router.get('/gastos/resumen', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+
+    const resumenResult = await pool.query(
+      `SELECT 
+         f.id AS finca_id, 
+         f.nombre AS finca_nombre, 
+         f.tamano,
+         f.tipo_cultivo,
+         COALESCE(f.dinero_ganado, 0) AS dinero_ganado,
+         COALESCE(f.dinero_gastado, 0) AS dinero_gastado,
+         COALESCE(SUM(g.cantidad), 0) AS total_gastos
+       FROM fincas f
+       LEFT JOIN gastos g ON g.finca_id = f.id
+       WHERE f.usuario_id = $1
+       GROUP BY f.id, f.nombre, f.tamano, f.tipo_cultivo, f.dinero_ganado, f.dinero_gastado
+       ORDER BY f.nombre`,
+      [userId]
+    );
+
+    res.status(200).json({ resumen: resumenResult.rows });
+
+  } catch (err) {
+    console.error('Error al obtener resumen de gastos:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
 
 // Ruta para obtener los gastos de una finca específica del jefe autenticado
 router.get('/gastos/:fincaId', async (req, res) => {
@@ -711,5 +755,8 @@ router.get('/gastos/:fincaId', async (req, res) => {
     res.status(500).json({ message: 'Error del servidor.' });
   }
 });
+
+
+
 
 module.exports = router;
