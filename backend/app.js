@@ -10,9 +10,10 @@ const app = express();
 
 // ✅ Middleware mejorado para CORS dinámico
 const allowedOrigins = [
-  'https://tfg-xi-jet.vercel.app',          // tu frontend anterior (si aún lo usas)
-  'http://localhost:5173',                    // frontend local
-  'https://proyecto-final-grado-alpha.vercel.app' // la URL que aparece en el error actual
+  'https://tfg-xi-jet.vercel.app',
+  'http://localhost:5173',
+  'https://proyecto-final-grado-alpha.vercel.app',
+  'https://ignaciopc.github.io'  // <--- Aquí tu dominio GitHub Pages
 ];
 
 app.use((req, res, next) => {
