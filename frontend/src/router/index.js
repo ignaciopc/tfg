@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import Register from '../views/register.vue'
 import Session from '../views/Session.vue'
 import Home from '../views/Home.vue'
@@ -110,10 +110,9 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes
 })
-
 // Guardia global para rutas protegidas
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
