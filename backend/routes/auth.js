@@ -54,7 +54,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.rows[0].id, email: user.rows[0].correo },
       SECRET_KEY,
-      { expiresIn: '1h' }
+      { expiresIn: '7d' }
     );
 
     res.status(200).json({ message: 'Inicio de sesión exitoso', token });
@@ -1261,7 +1261,7 @@ router.get('/fincas/pdf/todas', async (req, res) => {
 });
 
 
-  // ---------------- RUTA PARA GUARDAR USUARIO ----------------
+// ---------------- RUTA PARA GUARDAR USUARIO ----------------
 
 router.put('/usuarios/guardar', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -1311,7 +1311,7 @@ async function actualizarDineroGanado(fincaId) {
     [total, fincaId]
   );
 }
- // ---------------- CONTAR FINCAS DEL USUARIO ----------------
+// ---------------- CONTAR FINCAS DEL USUARIO ----------------
 router.get('/fincas/count', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'No token.' });
@@ -1335,8 +1335,123 @@ router.get('/fincas/count', async (req, res) => {
   }
 });
 
+// ---------------- OBTENER PRODUCCIONES DE UNA FINCA ----------------
+router.get('/fincas/:id/producciones', async (req, res) => {
+  const fincaId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM producciones WHERE finca_id = $1 ORDER BY fecha_inicio DESC',
+      [fincaId]
+    );
+    res.json({ producciones: result.rows });
+  } catch (error) {
+    console.error('Error al obtener producciones:', error);
+    res.status(500).json({ message: 'Error al obtener producciones' });
+  }
+});
+
+// ---------------- AÑADIR PRODUCCIÓN A UNA FINCA ----------------
+router.post('/fincas/:id/producciones', async (req, res) => {
+  const fincaId = req.params.id;
+  const { fecha_inicio, fecha_fin, tipo, cantidad, descripcion } = req.body;
+
+  if (!fecha_inicio || !fecha_fin || !tipo || !cantidad) {
+    return res.status(400).json({ message: 'Faltan campos obligatorios.' });
+  }
+
+  if (!['en_proceso', 'terminada'].includes(tipo)) {
+    return res.status(400).json({ message: 'Tipo no válido' });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO producciones (finca_id, fecha_inicio, fecha_fin, tipo, cantidad, descripcion)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [fincaId, fecha_inicio, fecha_fin, tipo, cantidad, descripcion]
+    );
+    res.status(201).json({ message: '✅ Producción registrada' });
+  } catch (error) {
+    console.error('Error insertando producción:', error);
+    res.status(500).json({ message: '❌ Error interno' });
+  }
+});
 
 
+// Editar producción
+router.put('/fincas/:fincaId/producciones/:id', async (req, res) => {
+  const { fecha_inicio, fecha_fin, tipo, cantidad, descripcion } = req.body
+  const { id } = req.params
+  await pool.query(
+    'UPDATE producciones SET fecha_inicio=$1, fecha_fin=$2, tipo=$3, cantidad=$4, descripcion=$5 WHERE id=$6',
+    [fecha_inicio, fecha_fin, tipo, cantidad, descripcion, id]
+  )
+  res.json({ message: 'Actualizada' })
+})
+
+// Eliminar
+router.delete('/fincas/:fincaId/producciones/:id', async (req, res) => {
+  const { id } = req.params
+  await pool.query('DELETE FROM producciones WHERE id = $1', [id])
+  res.json({ message: 'Eliminada' })
+})
+// ---------------- CALCULAR RENDIMIENTO DE PRODUCCIONES ----------------
+router.get('/fincas/:id/rendimiento-producciones', async (req, res) => {
+  const fincaId = req.params.id;
+  try {
+    const result = await pool.query(
+      `SELECT
+  p.id AS produccion_id,
+  p.descripcion,
+  p.tipo,
+  p.fecha_inicio,
+  p.fecha_fin,
+  p.cantidad AS produccion,
+
+  (
+    SELECT COALESCE(SUM(g.cantidad), 0)
+    FROM gastos g
+    WHERE g.finca_id = p.finca_id
+      AND g.fecha >= p.fecha_inicio
+      AND g.fecha <= p.fecha_fin
+  ) AS total_gastos,
+
+  (
+    SELECT COALESCE(SUM(i.cantidad), 0)
+    FROM ingresos i
+    WHERE i.finca_id = p.finca_id
+      AND i.creado_en::date >= p.fecha_inicio
+      AND i.creado_en::date <= p.fecha_fin
+  ) AS total_ingresos,
+
+  (
+    (
+      SELECT COALESCE(SUM(i.cantidad), 0)
+      FROM ingresos i
+      WHERE i.finca_id = p.finca_id
+        AND i.creado_en::date >= p.fecha_inicio
+        AND i.creado_en::date <= p.fecha_fin
+    ) -
+    (
+      SELECT COALESCE(SUM(g.cantidad), 0)
+      FROM gastos g
+      WHERE g.finca_id = p.finca_id
+        AND g.fecha >= p.fecha_inicio
+        AND g.fecha <= p.fecha_fin
+    )
+  ) AS rendimiento
+
+FROM producciones p
+WHERE p.finca_id = $1
+ORDER BY p.fecha_inicio DESC`,
+      [fincaId]
+    );
+    res.json({ producciones: result.rows });
+  } catch (error) {
+    console.error('Error al obtener rendimiento:', error);
+    res.status(500).json({ message: 'Error al obtener rendimiento' });
+  }
+});
 // ---------------- LISTAR FINCAS CON GEOMETRÍA Y DATOS ECONÓMICOS PARA UNA FINCA UNICA ----------------
 router.get('/fincas/:id', async (req, res) => {
   console.log('Hola desde la ruta de una finca única');

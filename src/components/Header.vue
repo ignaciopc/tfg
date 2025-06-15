@@ -18,6 +18,7 @@
                 <li><router-link to="/fincas/lista" class="dropdown-item">Lista de Fincas</router-link></li>
                 <li><router-link to="/fincas/mapa" class="dropdown-item">Mapa Interactivo</router-link></li>
                 <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/fincas/crear" class="dropdown-item">Agregar Nueva Finca</router-link></li>
+                <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/fincas/rendimiento" class="dropdown-item">Rendimiento</router-link></li>
               </ul>
             </li>
 

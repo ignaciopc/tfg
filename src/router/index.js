@@ -12,6 +12,7 @@ import ResumenFinanzas from '../views/ResumenFinanzas.vue';
 import ListaUsuarios from '../views/ListaUsuarios.vue'; 
 import GenerarDocumento from '../views/GenerarDocumento.vue'; 
 import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'; 
+import RendimientoFincas from '../views/RendimientoFincas.vue'; 
 
 const routes = [
   {
@@ -94,6 +95,12 @@ const routes = [
     path: '/cuenta',
     name: 'ConfiguracionCuenta',
     component: ConfiguracionCuenta,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/fincas/rendimiento',
+    name: 'RendimientoFincas',
+    component: RendimientoFincas,
     meta: { requiresAuth: true }
   },
   {

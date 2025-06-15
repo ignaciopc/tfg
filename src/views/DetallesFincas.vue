@@ -220,7 +220,81 @@
           </div>
 
           <!-- Fin de Tareas -->
+          <!-- 📦 Producciones -->
+          <div class="card mb-4">
+            <div class="card-header bg-info text-white fw-bold">📦 Producciones</div>
 
+            <div class="card-body">
+              <ul class="list-group mb-3">
+                <li v-for="(p, index) in producciones" :key="p.id"
+                  class="list-group-item d-flex justify-content-between align-items-start">
+                  <div class="ms-2 me-auto">
+                    <div class="fw-bold">{{ p.tipo === 'en_proceso' ? '🟡 En proceso' : '✅ Terminada' }}</div>
+                    <small>{{ formatearFecha(p.fecha_inicio) }} → {{ formatearFecha(p.fecha_fin) }}</small><br />
+                    <small>{{ p.cantidad }} unidades</small><br />
+                    <small class="text-muted">{{ p.descripcion }}</small>
+                  </div>
+
+                  <div class="btn-group btn-group-sm mt-2" role="group">
+                    <button @click="editarProduccion(index)" class="btn btn-warning">✏️</button>
+                    <button @click="eliminarProduccion(p.id)" class="btn btn-danger">🗑️</button>
+                  </div>
+                </li>
+                <li v-if="producciones.length === 0" class="list-group-item">No hay producciones registradas.</li>
+              </ul>
+
+              <!-- Formulario -->
+              <div class="row g-2 mb-3">
+                <div class="col-md-2">
+                  <input type="date" v-model="nuevaProduccion.fecha_inicio" class="form-control" required />
+                </div>
+                <div class="col-md-2">
+                  <input type="date" v-model="nuevaProduccion.fecha_fin" class="form-control" required />
+                </div>
+                <div class="col-md-2">
+                  <select v-model="nuevaProduccion.tipo" class="form-select" required>
+                    <option disabled value="">Tipo</option>
+                    <option value="en_proceso">En Proceso</option>
+                    <option value="terminada">Terminada</option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <input type="number" v-model="nuevaProduccion.cantidad" class="form-control" placeholder="Cantidad"
+                    required />
+                </div>
+                <div class="col-md-3">
+                  <input type="text" v-model="nuevaProduccion.descripcion" class="form-control"
+                    placeholder="Descripción" />
+                </div>
+                <div class="col-md-1">
+                  <button @click="modoEdicion ? actualizarProduccion() : agregarProduccion()"
+                    class="btn btn-success w-100">
+                    {{ modoEdicion ? '💾' : '➕' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Fin de Producciones -->
+
+          <div class="card mb-4">
+            <div class="card-header bg-info text-white fw-bold">📈 Rendimiento por Producción</div>
+            <div class="card-body">
+              <ul class="list-group">
+                <li v-for="r in rendimientoProducciones" :key="r.produccion_id" class="list-group-item">
+                  <div class="fw-bold">{{ r.descripcion || 'Sin descripción' }}</div>
+                  <small>📅 {{ formatearFecha(r.fecha_inicio) }} → {{ formatearFecha(r.fecha_fin) }}</small><br />
+                  <small>📦 Producción: {{ r.produccion }} unidades</small><br />
+                  <small>💸 Gastos: €{{ r.total_gastos }}</small><br />
+                  <small>💰 Ingresos: €{{ r.total_ingresos }}</small><br />
+                  <strong class="text-success">💹 Rendimiento: €{{ r.rendimiento }}</strong>
+                </li>
+                <li v-if="rendimientoProducciones.length === 0" class="list-group-item text-muted">
+                  No hay datos de rendimiento aún.
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -693,7 +767,97 @@ const fetchIngresos = async () => {
   }
 }
 
+const producciones = ref([])
+const nuevaProduccion = ref({
+  fecha_inicio: '',
+  fecha_fin: '',
+  tipo: '',
+  cantidad: null,
+  descripcion: '',
+})
+const modoEdicion = ref(false)
+const produccionEditandoId = ref(null)
 
+const fetchProducciones = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+  const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/producciones`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const data = await res.json()
+  producciones.value = data.producciones || []
+}
+
+const agregarProduccion = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+  const body = { ...nuevaProduccion.value, finca_id: fincaId }
+
+  const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/producciones`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) return alert('❌ Error al guardar')
+  await fetchProducciones()
+  nuevaProduccion.value = { fecha_inicio: '', fecha_fin: '', tipo: '', cantidad: null, descripcion: '' }
+}
+
+const editarProduccion = (index) => {
+  const p = producciones.value[index]
+  produccionEditandoId.value = p.id
+  nuevaProduccion.value = { ...p }
+  modoEdicion.value = true
+}
+
+const actualizarProduccion = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+  const id = produccionEditandoId.value
+
+  const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/producciones/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(nuevaProduccion.value),
+  })
+
+  if (!res.ok) return alert('❌ Error al actualizar')
+
+  await fetchProducciones()
+  modoEdicion.value = false
+  produccionEditandoId.value = null
+  nuevaProduccion.value = { fecha_inicio: '', fecha_fin: '', tipo: '', cantidad: null, descripcion: '' }
+}
+
+const eliminarProduccion = async (id) => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+
+  const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/producciones/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) return alert('❌ Error al eliminar')
+  await fetchProducciones()
+}
+
+const rendimientoProducciones = ref([])
+
+const fetchRendimientoProducciones = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+
+  try {
+    const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/rendimiento-producciones`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const data = await res.json()
+    rendimientoProducciones.value = data.producciones || []
+  } catch (error) {
+    console.error('❌ Error al obtener rendimiento:', error)
+  }
+}
 
 onMounted(async () => {
   await fetchFinca()
@@ -704,6 +868,8 @@ onMounted(async () => {
   await fetchUsuarioActual()
   await actualizarDineroGastado()
   await fetchIngresos()
+  await fetchProducciones()
+  await fetchRendimientoProducciones()
 })
 
 
@@ -712,4 +878,13 @@ const actualizarDineroGanado = async () => {
   calcularProgreso();
 };
 
+const formatearFecha = (fecha) => {
+  if (!fecha) return ''
+  const d = new Date(fecha)
+  return d.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
 </script>
