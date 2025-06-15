@@ -35,6 +35,11 @@ app.use((req, res, next) => {
 // ✅ Parseo de JSON
 app.use(bodyParser.json());
 
+// ✅ Ruta raíz para test rápido
+app.get('/', (req, res) => {
+  res.json({ message: 'Backend funcionando correctamente' });
+});
+
 // ✅ Rutas
 app.use('/api', authRoutes);
 app.use('/api/fincas', fincasRouter);
