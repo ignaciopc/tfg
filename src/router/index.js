@@ -9,6 +9,8 @@ import ListaTareas from '../views/ListaTareas.vue';
 import GestionRoles from '../views/GestionRoles.vue'; 
 import CalendarioTareas from '../views/CalendarioTareas.vue'; 
 import ResumenFinanzas from '../views/ResumenFinanzas.vue'; 
+import ListaUsuarios from '../views/ListaUsuarios.vue'; 
+import GenerarDocumento from '../views/GenerarDocumento.vue'; 
 
 const routes = [
   {
@@ -73,6 +75,18 @@ const routes = [
     path: '/finanzas/resumen',
     name: 'ResumenFinanzas',
     component: ResumenFinanzas,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/usuarios/lista',
+    name: 'ListaUsuarios',
+    component: ListaUsuarios,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/documentos/generar',
+    name: 'GenerarDocumento',
+    component: GenerarDocumento,
     meta: { requiresAuth: true }
   },
   {

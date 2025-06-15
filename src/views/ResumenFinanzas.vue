@@ -26,40 +26,16 @@
                             <td>{{ formatCurrency(finca.total_gastos ?? 0) }}</td>
                             <td>{{ formatCurrency(finca.dinero_ganado ?? 0) }}</td>
                             <td>{{ formatCurrency((finca.dinero_ganado ?? 0) - (finca.total_gastos ?? 0)) }}</td>
-                            <!-- Beneficio -->
                             <td>
-                                <button @click="toggleDetalle(finca.finca_id)">
-                                    {{ detalleVisible === finca.finca_id ? 'Ocultar' : 'Mostrar' }}
-                                </button>
-                            </td>
-                        </tr>
-
-                        <!-- fila detalle permanece igual -->
-                        <tr v-if="detalleVisible === finca.finca_id">
-                            <td colspan="5">
-                                <p><strong>Ubicación:</strong> {{ finca.municipio }}</p>
-                                <p><strong>Tamaño:</strong> {{ finca.tamano }} ha</p>
-                                <p><strong>Tipo de cultivo:</strong> {{ finca.tipo_cultivo }}</p>
-                                <p><strong>Beneficio:</strong> {{ formatCurrency((finca.dinero_ganado ?? 0) -
-                                    (finca.total_gastos ?? 0)) }}</p>
-
-                                <h5>Gastos Detallados:</h5>
-                                <ul v-if="finca.gastos">
-                                    <li v-for="gasto in finca.gastos" :key="gasto.id">
-                                        {{ gasto.descripcion }} - {{ formatCurrency(gasto.cantidad) }}
-                                    </li>
-                                </ul>
-
-                                <h5>Trabajadores:</h5>
-                                <ul v-if="finca.trabajadores">
-                                    <li v-for="trabajador in finca.trabajadores" :key="trabajador.id">
-                                        {{ trabajador.nombre }} — {{ formatCurrency(trabajador.sueldo) }}
-                                    </li>
-                                </ul>
+                                <router-link :to="`/fincas/detalles/${finca.finca_id}`" class="btn btn-primary"
+                                    target="_blank">
+                                    Saber más
+                                </router-link>
                             </td>
                         </tr>
                     </template>
                 </tbody>
+
             </table>
 
         </div>
@@ -72,7 +48,7 @@ import ResumenGrafica from '../components/ResumenGrafica.vue'
 
 export default {
     components: {
-        ResumenGrafica,  // <-- Regístralo aquí
+        ResumenGrafica,
     },
     data() {
         return {
@@ -108,9 +84,41 @@ export default {
                 currency: 'EUR',
             }).format(valor)
         },
-        toggleDetalle(id) {
-            this.detalleVisible = this.detalleVisible === id ? null : id
-        },
+        async toggleDetalle(id) {
+            if (this.detalleVisible === id) {
+                this.detalleVisible = null
+                return
+            }
+            this.detalleVisible = id
+
+            const finca = this.resumen.find(f => f.finca_id === id)
+            if (!finca.gastos || !finca.trabajadores || !finca.municipio) {
+                try {
+                    const token = localStorage.getItem('token')
+
+                    // Obtener gastos detallados
+                    const gastosRes = await axios.get(`/api/gastos/${id}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    })
+                    finca.gastos = gastosRes.data
+
+                    // Obtener trabajadores
+                    const trabajadoresRes = await axios.get(`/api/fincas/${id}/trabajadores`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    })
+                    finca.trabajadores = trabajadoresRes.data.trabajadores
+
+                    // Obtener detalle finca con municipio
+                    const fincaRes = await axios.get(`/api/fincas/${id}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    })
+                    finca.municipio = fincaRes.data.municipio
+
+                } catch (error) {
+                    console.error('Error cargando detalles:', error)
+                }
+            }
+        }
     },
     mounted() {
         this.cargarResumen()

@@ -4,6 +4,9 @@ const bcrypt = require('bcrypt');
 const pool = require('../db'); // Conexión a PostgreSQL
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const { createCanvas } = require('canvas');
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+
 require('dotenv').config();
 
 const SECRET_KEY = '1234567890'; // Reemplaza esto por process.env.SECRET_KEY en producción
@@ -756,7 +759,389 @@ router.get('/gastos/:fincaId', async (req, res) => {
   }
 });
 
+router.post('/ingresos', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
 
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const jefeId = decoded.id;
 
+    const { finca_id, descripcion, cantidad } = req.body;
 
+    // Validar que la finca pertenezca al usuario autenticado
+    const fincaCheck = await pool.query(
+      `SELECT * FROM fincas WHERE id = $1 AND usuario_id = $2`,
+      [finca_id, jefeId]
+    );
+
+    if (fincaCheck.rowCount === 0) {
+      return res.status(403).json({ message: 'No tienes acceso a esta finca.' });
+    }
+
+    // Insertar ingreso
+    await pool.query(
+      `INSERT INTO ingresos (finca_id, descripcion, cantidad)
+       VALUES ($1, $2, $3)`,
+      [finca_id, descripcion, cantidad]
+    );
+
+    res.status(201).json({ message: 'Ingreso registrado con éxito.' });
+
+  } catch (err) {
+    console.error('Error al registrar ingreso:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+router.get('/ingresos/resumen', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+
+    const resumenResult = await pool.query(
+      `SELECT 
+         f.id AS finca_id, 
+         f.nombre AS finca_nombre, 
+         f.tamano,
+         f.tipo_cultivo,
+         COALESCE(SUM(i.cantidad), 0) AS total_ingresos
+       FROM fincas f
+       LEFT JOIN ingresos i ON i.finca_id = f.id
+       WHERE f.usuario_id = $1
+       GROUP BY f.id, f.nombre, f.tamano, f.tipo_cultivo
+       ORDER BY f.nombre`,
+      [userId]
+    );
+
+    res.status(200).json({ resumen: resumenResult.rows });
+
+  } catch (err) {
+    console.error('Error al obtener resumen de ingresos:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+router.get('/ingresos/:fincaId', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded.id;
+    const fincaId = req.params.fincaId;
+
+    // Validar que la finca pertenece al usuario
+    const fincaCheck = await pool.query(
+      `SELECT * FROM fincas WHERE id = $1 AND usuario_id = $2`,
+      [fincaId, userId]
+    );
+
+    if (fincaCheck.rowCount === 0) {
+      return res.status(403).json({ message: 'No tienes acceso a esta finca.' });
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM ingresos WHERE finca_id = $1`,
+      [fincaId]
+    );
+
+    res.status(200).json(result.rows);
+
+  } catch (err) {
+    console.error('Error al obtener ingresos:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+// ---------------- OBTENER SUBORDINADOS DE UN JEFE ----------------
+router.get('/usuarios/subordinados', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No se proporcionó token.' });
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const jefeId = decoded.id;
+
+    const result = await pool.query(
+      `SELECT id, nombre, correo, telefono, rol, fecha_registro, activo
+       FROM usuarios
+       WHERE jefe_id = $1`,
+      [jefeId]
+    );
+
+    res.status(200).json({ subordinados: result.rows });
+  } catch (err) {
+    console.error('Error al obtener subordinados:', err);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+router.delete('/api/usuarios/:id', async (req, res) => {
+  // validar token, permisos, etc.
+  const userId = parseInt(req.params.id)
+  try {
+    await pool.query('DELETE FROM usuarios WHERE id = $1', [userId])
+    res.status(200).json({ message: 'Usuario eliminado' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Error eliminando usuario' })
+  }
+})
+
+const PDFDocument = require('pdfkit');
+
+const width = 600;
+const height = 300;
+const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height });
+
+router.get('/fincas/:id/pdf', async (req, res) => {
+  try {
+    const fincaId = req.params.id;
+
+    // 1. Obtener finca
+    const fincaResult = await pool.query(
+      `SELECT id, nombre, tamano, tipo_cultivo, usuario_id, fecha_creacion, 
+       objetivo_ingresos, dinero_gastado, dinero_ganado, trabajadores
+       FROM fincas WHERE id = $1`,
+      [fincaId]
+    );
+
+    if (fincaResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Finca no encontrada' });
+    }
+
+    const finca = fincaResult.rows[0];
+
+    // 2. Obtener gastos detallados
+    const gastosResult = await pool.query(
+      `SELECT descripcion, cantidad, fecha FROM gastos WHERE finca_id = $1 ORDER BY fecha`,
+      [fincaId]
+    );
+    const gastos = gastosResult.rows;
+
+    // 3. Sumar total gastos (por si quieres mostrar)
+    const totalGastos = gastos.reduce((sum, gasto) => sum + Number(gasto.cantidad || 0), 0);
+
+    // 4. Crear configuración del gráfico
+    const config = {
+      type: 'bar',
+      data: {
+        labels: ['Dinero Ganado', 'Dinero Gastado'],
+        datasets: [{
+          label: finca.nombre,
+          data: [Number(finca.dinero_ganado) || 0, totalGastos],
+          backgroundColor: ['#4CAF50', '#F44336'],
+        }],
+      },
+      options: {
+        responsive: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: 'Dinero Ganado vs Gastado',
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+          },
+        },
+      },
+    };
+
+    // 5. Renderizar gráfico a imagen (buffer)
+    const imageBuffer = await chartJSNodeCanvas.renderToBuffer(config);
+
+    // 6. Crear PDF y enviar
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=finca_${finca.id}.pdf`);
+
+    doc.pipe(res);
+
+    // 7. Información finca
+    doc.fontSize(20).text(`Informe finca: ${finca.nombre}`, { align: 'center' });
+    doc.moveDown();
+
+    doc.fontSize(12);
+    doc.text(`ID: ${finca.id}`);
+    doc.text(`Nombre: ${finca.nombre}`);
+    doc.text(`Tamaño: ${finca.tamano}`);
+    doc.text(`Tipo de Cultivo: ${finca.tipo_cultivo}`);
+    doc.text(`Usuario ID: ${finca.usuario_id}`);
+    doc.text(`Fecha de Creación: ${new Date(finca.fecha_creacion).toLocaleDateString()}`);
+
+    const objetivoIngresos = Number(finca.objetivo_ingresos) || 0;
+    doc.text(`Objetivo de Ingresos: €${objetivoIngresos.toFixed(2)}`);
+
+    const dineroGastado = Number(finca.dinero_gastado) || 0;
+    doc.text(`Dinero Gastado (tabla fincas): €${dineroGastado.toFixed(2)}`);
+
+    const dineroGanado = Number(finca.dinero_ganado) || 0;
+    doc.text(`Dinero Ganado: €${dineroGanado.toFixed(2)}`);
+
+    const trabajadores = Number(finca.trabajadores) || 0;
+    doc.text(`Trabajadores: ${trabajadores}`);
+
+    doc.text(`Total Gastos (tabla gastos): €${totalGastos.toFixed(2)}`);
+    doc.moveDown();
+
+    // 8. Gastos detallados
+    doc.fontSize(16).text('Gastos detallados:', { underline: true });
+    doc.moveDown(0.5);
+
+    if (gastos.length === 0) {
+      doc.text('No hay gastos registrados para esta finca.');
+    } else {
+      gastos.forEach(gasto => {
+        const fecha = new Date(gasto.fecha).toLocaleDateString();
+        const cantidad = Number(gasto.cantidad) || 0;
+        doc.text(`- ${fecha}: ${gasto.descripcion} - €${cantidad.toFixed(2)}`);
+      });
+    }
+
+    doc.moveDown();
+
+    // 9. Insertar gráfico
+    doc.image(imageBuffer, { fit: [500, 300], align: 'center' });
+
+    doc.end();
+
+  } catch (error) {
+    console.error('Error generando PDF con info y gráfico:', error);
+
+    // Solo enviar respuesta de error si NO hemos empezado a enviar PDF
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Error generando PDF' });
+    }
+  }
+});
+  // ---------------- OBTENER PDF CON TODAS LAS FINCAS ----------------
+router.get('/fincas/pdf/todas', async (req, res) => {
+  try {
+    // 1. Obtener todas las fincas
+    const fincasResult = await pool.query(
+      `SELECT id, nombre, tamano, tipo_cultivo, usuario_id, fecha_creacion, 
+              objetivo_ingresos, dinero_gastado, dinero_ganado, trabajadores
+       FROM fincas ORDER BY id`
+    );
+    const fincas = fincasResult.rows;
+
+    if (fincas.length === 0) {
+      return res.status(404).json({ message: 'No hay fincas para generar PDF' });
+    }
+
+    // 2. Crear PDF
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=fincas_todas.pdf');
+
+    doc.pipe(res);
+
+    // 3. Iterar cada finca y agregar info, gastos y gráfico
+    for (let i = 0; i < fincas.length; i++) {
+      const finca = fincas[i];
+
+      // Obtener gastos detallados
+      const gastosResult = await pool.query(
+        `SELECT descripcion, cantidad, fecha FROM gastos WHERE finca_id = $1 ORDER BY fecha`,
+        [finca.id]
+      );
+      const gastos = gastosResult.rows;
+
+      const totalGastos = gastos.reduce((sum, gasto) => sum + Number(gasto.cantidad || 0), 0);
+
+      // Configuración gráfico
+      const config = {
+        type: 'bar',
+        data: {
+          labels: ['Dinero Ganado', 'Dinero Gastado'],
+          datasets: [{
+            label: finca.nombre,
+            data: [Number(finca.dinero_ganado) || 0, totalGastos],
+            backgroundColor: ['#4CAF50', '#F44336'],
+          }],
+        },
+        options: {
+          responsive: false,
+          animation: false,
+          plugins: {
+            legend: { display: false },
+            title: {
+              display: true,
+              text: 'Dinero Ganado vs Gastado',
+            },
+          },
+          scales: {
+            y: { beginAtZero: true },
+          },
+        },
+      };
+
+      const imageBuffer = await chartJSNodeCanvas.renderToBuffer(config);
+
+      // Agregar página nueva excepto la primera
+      if (i > 0) doc.addPage();
+
+      // Info finca
+      doc.fontSize(20).text(`Informe finca: ${finca.nombre}`, { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(12);
+      doc.text(`ID: ${finca.id}`);
+      doc.text(`Nombre: ${finca.nombre}`);
+      doc.text(`Tamaño: ${finca.tamano}`);
+      doc.text(`Tipo de Cultivo: ${finca.tipo_cultivo}`);
+      doc.text(`Usuario ID: ${finca.usuario_id}`);
+      doc.text(`Fecha de Creación: ${new Date(finca.fecha_creacion).toLocaleDateString()}`);
+
+      const objetivoIngresos = Number(finca.objetivo_ingresos) || 0;
+      doc.text(`Objetivo de Ingresos: €${objetivoIngresos.toFixed(2)}`);
+
+      const dineroGastado = Number(finca.dinero_gastado) || 0;
+      doc.text(`Dinero Gastado (tabla fincas): €${dineroGastado.toFixed(2)}`);
+
+      const dineroGanado = Number(finca.dinero_ganado) || 0;
+      doc.text(`Dinero Ganado: €${dineroGanado.toFixed(2)}`);
+
+      const trabajadores = Number(finca.trabajadores) || 0;
+      doc.text(`Trabajadores: ${trabajadores}`);
+
+      doc.text(`Total Gastos (tabla gastos): €${totalGastos.toFixed(2)}`);
+      doc.moveDown();
+
+      // Gastos detallados
+      doc.fontSize(16).text('Gastos detallados:', { underline: true });
+      doc.moveDown(0.5);
+
+      if (gastos.length === 0) {
+        doc.text('No hay gastos registrados para esta finca.');
+      } else {
+        gastos.forEach(gasto => {
+          const fecha = new Date(gasto.fecha).toLocaleDateString();
+          const cantidad = Number(gasto.cantidad) || 0;
+          doc.text(`- ${fecha}: ${gasto.descripcion} - €${cantidad.toFixed(2)}`);
+        });
+      }
+
+      doc.moveDown();
+
+      // Insertar gráfico
+      doc.image(imageBuffer, { fit: [500, 300], align: 'center' });
+    }
+
+    doc.end();
+
+  } catch (error) {
+    console.error('Error generando PDF con todas las fincas:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Error generando PDF' });
+    }
+  }
+});
 module.exports = router;

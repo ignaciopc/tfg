@@ -35,8 +35,6 @@
             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Finanzas</a>
             <ul class="dropdown-menu">
               <li><router-link to="/finanzas/resumen" class="dropdown-item">Resumen de Finanzas</router-link></li>
-              <li><router-link to="/finanzas/rentabilidad" class="dropdown-item">Informe de Rentabilidad</router-link></li>
-              <li><router-link to="/finanzas/inventario" class="dropdown-item">Inventario</router-link></li>
               <li v-if="usuarioActual?.rol !== 'trabajador'"><router-link to="/finanzas/informe-financiero" class="dropdown-item">Informe Financiero</router-link></li>
 
             </ul>
@@ -55,20 +53,12 @@
           <li class="nav-item dropdown" v-if="isAuthenticated" >
             <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Documentos</a>
             <ul class="dropdown-menu">
-              <li><router-link to="/documentos/gestion" class="dropdown-item">Gestión de Documentos</router-link></li>
+              <li><router-link to="/documentos/generar" class="dropdown-item">Gestión de Documentos</router-link></li>
               <li><router-link to="/documentos/vencimientos" class="dropdown-item">Control de Vencimientos</router-link></li>
             </ul>
           </li>
 
-          <!-- Reportes -->
-          <li class="nav-item dropdown" v-if="isAuthenticated && usuarioActual?.rol !== 'trabajador'">
-            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Reportes</a>
-            <ul class="dropdown-menu">
-              <li><router-link to="/reportes/generacion" class="dropdown-item">Generación de Reportes</router-link></li>
-              <li><router-link to="/reportes/exportacion" class="dropdown-item">Exportación de Datos</router-link></li>
-            </ul>
-          </li>
-
+        
           <!-- Cuenta -->
           <li class="nav-item" v-if="isAuthenticated">
             <router-link to="/account" class="nav-link">Cuenta</router-link>

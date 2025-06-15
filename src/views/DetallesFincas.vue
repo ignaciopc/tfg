@@ -1,207 +1,217 @@
-<template>
-  <div class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
+  <template>
+    <div class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-10">
 
-        <!-- 🔖 Datos básicos -->
-        <div class="card mb-4">
-          <div class="card-header bg-primary text-white fw-bold">🔖 Datos básicos</div>
-          <div class="card-body">
-            <p><strong>Nombre:</strong> {{ finca.nombre }}</p>
-            <p><strong>Ubicación (Municipio):</strong> {{ finca.municipio }}</p>
-            <p><strong>Tamaño:</strong> {{ finca.tamano }} ha</p>
-            <p><strong>Tipo de cultivo:</strong> {{ finca.tipo_cultivo }}</p>
-            <p><strong>Propietario (Usuario ID):</strong> {{ finca.usuario_id }}</p>
-          </div>
-        </div>
-
-        <!-- 💰 Sección Económica -->
-        <div class="card mb-4" v-if="usuarioActual?.rol !== 'trabajador'">
-          <div class="card-header bg-success text-white fw-bold">💰 Sección Económica</div>
-          <div class="card-body">
-            <div class="mb-3">
-              <label class="form-label">Objetivo de ingresos:</label>
-              <input v-model.number="finca.objetivo_ingresos" type="number" class="form-control" />
+          <!-- 🔖 Datos básicos -->
+          <div class="card mb-4">
+            <div class="card-header bg-primary text-white fw-bold">🔖 Datos básicos</div>
+            <div class="card-body">
+              <p><strong>Nombre:</strong> {{ finca.nombre }}</p>
+              <p><strong>Ubicación (Municipio):</strong> {{ finca.municipio }}</p>
+              <p><strong>Tamaño:</strong> {{ finca.tamano }} ha</p>
+              <p><strong>Tipo de cultivo:</strong> {{ finca.tipo_cultivo }}</p>
+              <p><strong>Propietario (Usuario ID):</strong> {{ finca.usuario_id }}</p>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Dinero gastado:</label>
-              <input v-model.number="finca.dinero_gastado" type="number" class="form-control" />
-              <!-- 📑 Gastos Detallados -->
+          </div>
+
+          <!-- 💰 Sección Económica -->
+          <div class="card mb-4" v-if="usuarioActual?.rol !== 'trabajador'">
+            <div class="card-header bg-success text-white fw-bold">💰 Sección Económica</div>
+            <div class="card-body">
               <div class="mb-3">
-                <label class="form-label">📑 Gastos detallados:</label>
+                <label class="form-label">Objetivo de ingresos:</label>
+                <input v-model.number="finca.objetivo_ingresos" type="number" class="form-control" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Dinero gastado:</label>
+                <input v-model.number="finca.dinero_gastado" type="number" class="form-control" />
+                <!-- 📑 Gastos Detallados -->
+                <div class="mb-3">
+                  <label class="form-label">📑 Gastos detallados:</label>
+                  <ul class="list-group mb-2">
+                    <li v-for="(gasto, index) in gastos" :key="index"
+                      class="list-group-item d-flex justify-content-between">
+                      <div>
+                        <strong>{{ gasto.descripcion }}</strong>: ${{ gasto.cantidad }}
+                      </div>
+                    </li>
+                    <li v-if="gastos.length === 0" class="list-group-item">No hay gastos registrados.</li>
+                  </ul>
+
+                  <div class="input-group">
+                    <input v-model="nuevoGasto.descripcion" type="text" class="form-control"
+                      placeholder="Descripción" />
+                    <input v-model.number="nuevoGasto.cantidad" type="number" class="form-control"
+                      placeholder="Cantidad" />
+                    <button class="btn btn-outline-success" @click="agregarGasto">➕ Añadir gasto</button>
+                  </div>
+                </div>
+
+              </div>
+              <!-- 📈 Ingresos detallados -->
+              <div class="mb-3">
+                <label class="form-label">📈 Ingresos detallados:</label>
                 <ul class="list-group mb-2">
-                  <li v-for="(gasto, index) in gastos" :key="index"
+                  <li v-for="(ingreso, index) in ingresos" :key="index"
                     class="list-group-item d-flex justify-content-between">
                     <div>
-                      <strong>{{ gasto.descripcion }}</strong>: ${{ gasto.cantidad }}
+                      <strong>{{ ingreso.descripcion }}</strong>: ${{ ingreso.cantidad }}
                     </div>
                   </li>
-                  <li v-if="gastos.length === 0" class="list-group-item">No hay gastos registrados.</li>
+                  <li v-if="ingresos.length === 0" class="list-group-item">No hay ingresos registrados.</li>
                 </ul>
 
                 <div class="input-group">
-                  <input v-model="nuevoGasto.descripcion" type="text" class="form-control" placeholder="Descripción" />
-                  <input v-model.number="nuevoGasto.cantidad" type="number" class="form-control"
+                  <input v-model="nuevoIngreso.descripcion" type="text" class="form-control"
+                    placeholder="Descripción" />
+                  <input v-model.number="nuevoIngreso.cantidad" type="number" class="form-control"
                     placeholder="Cantidad" />
-                  <button class="btn btn-outline-success" @click="agregarGasto">➕ Añadir gasto</button>
+                  <button class="btn btn-outline-success" @click="agregarIngreso">➕ Añadir ingreso</button>
                 </div>
               </div>
 
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Dinero ganado:</label>
-              <input v-model.number="finca.dinero_ganado" type="number" class="form-control" />
-            </div>
+              <button @click="guardarCambios" class="btn btn-sm btn-primary">💾 Guardar todos los cambios</button>
 
-            <button @click="guardarCambios" class="btn btn-sm btn-primary">💾 Guardar todos los cambios</button>
-
-            <p class="mt-3"><strong>Ganancia estimada:</strong> ${{ finca.dinero_ganado - finca.dinero_gastado }}</p>
-            <div class="mt-3">
-              <label class="form-label">📊 Progreso económico</label>
-              <div class="progress">
-                <div class="progress-bar" :class="barraColor" role="progressbar"
-                  :style="{ width: progresoGananciaReal + '%' }" :aria-valuenow="progresoGananciaReal" aria-valuemin="0"
-                  aria-valuemax="100">
-                  {{ progresoGananciaReal.toFixed(1) }}%
+              <p class="mt-3"><strong>Ganancia estimada:</strong> ${{ finca.dinero_ganado - finca.dinero_gastado }}</p>
+              <div class="mt-3">
+                <label class="form-label">📊 Progreso económico</label>
+                <div class="progress">
+                  <div class="progress-bar" :class="barraColor" role="progressbar"
+                    :style="{ width: progresoGananciaReal + '%' }" :aria-valuenow="progresoGananciaReal"
+                    aria-valuemin="0" aria-valuemax="100">
+                    {{ progresoGananciaReal.toFixed(1) }}%
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 👨‍🌾 Trabajadores -->
-        <div class="card mb-4" v-if="usuarioActual?.rol !== 'trabajador'">
-          <div class="card-header bg-info text-white fw-bold">👨‍🌾 Trabajadores</div>
-          <div class="card-body">
-            <ul class="list-group mb-3">
-              <li v-for="(trabajador, index) in trabajadores" :key="trabajador.id || index"
-                class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <strong>{{ trabajador.nombre }}</strong> — ${{ trabajador.sueldo }}
+          <!-- 👨‍🌾 Trabajadores -->
+          <div class="card mb-4" v-if="usuarioActual?.rol !== 'trabajador'">
+            <div class="card-header bg-info text-white fw-bold">👨‍🌾 Trabajadores</div>
+            <div class="card-body">
+              <ul class="list-group mb-3">
+                <li v-for="(trabajador, index) in trabajadores" :key="trabajador.id || index"
+                  class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>{{ trabajador.nombre }}</strong> — ${{ trabajador.sueldo }}
+                  </div>
+                  <button @click="eliminarTrabajador(index)" class="btn btn-danger btn-sm">Eliminar</button>
+                </li>
+                <li v-if="trabajadores.length === 0" class="list-group-item">
+                  No hay trabajadores registrados.
+                </li>
+              </ul>
+
+              <div class="mb-3 row g-2">
+                <div class="col">
+                  <input v-model="nuevoTrabajador.nombre" type="text" class="form-control" placeholder="Nombre" />
                 </div>
-                <button @click="eliminarTrabajador(index)" class="btn btn-danger btn-sm">Eliminar</button>
-              </li>
-              <li v-if="trabajadores.length === 0" class="list-group-item">
-                No hay trabajadores registrados.
-              </li>
-            </ul>
+                <div class="col">
+                  <input v-model.number="nuevoTrabajador.sueldo" type="number" class="form-control"
+                    placeholder="Sueldo" />
+                </div>
+                <div class="col-auto">
+                  <button @click="agregarTrabajador" class="btn btn-success">Añadir</button>
+                </div>
+              </div>
 
-            <div class="mb-3 row g-2">
-              <div class="col">
-                <input v-model="nuevoTrabajador.nombre" type="text" class="form-control" placeholder="Nombre" />
-              </div>
-              <div class="col">
-                <input v-model.number="nuevoTrabajador.sueldo" type="number" class="form-control"
-                  placeholder="Sueldo" />
-              </div>
-              <div class="col-auto">
-                <button @click="agregarTrabajador" class="btn btn-success">Añadir</button>
-              </div>
+              <button @click="guardarTrabajadores" class="btn btn-primary">💾 Guardar Trabajadores</button>
             </div>
-
-            <button @click="guardarTrabajadores" class="btn btn-primary">💾 Guardar Trabajadores</button>
           </div>
-        </div>
 
-        <!-- 🗓️ Calendario de cultivo -->
-        <div class="card mb-4">
-          <div class="card-header bg-warning text-dark fw-bold">🗓️ Calendario de cultivo</div>
-          <div class="card-body">
-            <ul class="list-group list-group-flush mb-3">
-              <li v-for="(etapa, index) in calendario" :key="etapa.id || index"
-                class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <strong>{{ etapa.etapa }}:</strong> {{ etapa.fecha_inicio }} hasta {{ etapa.fecha_fin }}
+          <!-- 🗓️ Calendario de cultivo -->
+          <div class="card mb-4">
+            <div class="card-header bg-warning text-dark fw-bold">🗓️ Calendario de cultivo</div>
+            <div class="card-body">
+              <ul class="list-group list-group-flush mb-3">
+                <li v-for="(etapa, index) in calendario" :key="etapa.id || index"
+                  class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>{{ etapa.etapa }}:</strong> {{ etapa.fecha_inicio }} hasta {{ etapa.fecha_fin }}
+                  </div>
+                  <button class="btn btn-sm btn-danger" @click="eliminarEtapa(index)">🗑️</button>
+                </li>
+                <li v-if="calendario.length === 0" class="list-group-item">
+                  No hay etapas registradas.
+                </li>
+              </ul>
+
+              <div class="mb-3 row g-2">
+                <div class="col">
+                  <input v-model="nuevaEtapa.etapa" type="text" class="form-control" placeholder="Nombre de la etapa" />
                 </div>
-                <button class="btn btn-sm btn-danger" @click="eliminarEtapa(index)">🗑️</button>
-              </li>
-              <li v-if="calendario.length === 0" class="list-group-item">
-                No hay etapas registradas.
-              </li>
-            </ul>
+                <div class="col">
+                  <input v-model="nuevaEtapa.fecha_inicio" type="date" class="form-control" />
+                </div>
+                <div class="col">
+                  <input v-model="nuevaEtapa.fecha_fin" type="date" class="form-control" />
+                </div>
+                <div class="col-auto">
+                  <button @click="agregarEtapa" class="btn btn-success">➕ Añadir</button>
+                </div>
+              </div>
 
-            <div class="mb-3 row g-2">
-              <div class="col">
-                <input v-model="nuevaEtapa.etapa" type="text" class="form-control" placeholder="Nombre de la etapa" />
-              </div>
-              <div class="col">
-                <input v-model="nuevaEtapa.fecha_inicio" type="date" class="form-control" />
-              </div>
-              <div class="col">
-                <input v-model="nuevaEtapa.fecha_fin" type="date" class="form-control" />
-              </div>
-              <div class="col-auto">
-                <button @click="agregarEtapa" class="btn btn-success">➕ Añadir</button>
-              </div>
+              <button @click="guardarCalendario" class="btn btn-primary">💾 Guardar Calendario</button>
             </div>
-
-            <button @click="guardarCalendario" class="btn btn-primary">💾 Guardar Calendario</button>
           </div>
-        </div>
 
-        <!-- 📋 Tareas -->
-        <div class="card mb-4">
-          <div class="card-header bg-secondary text-white fw-bold">📋 Tareas</div>
-          <div class="card-body">
-            <ul class="list-group mb-3">
-              <li v-for="(tarea, index) in tareas" :key="tarea.id || index"
-                class="list-group-item d-flex justify-content-between align-items-center"
-                :class="{ 'list-group-item-success': tarea.completada }">
-                <div>
-                  <strong>{{ tarea.titulo }}</strong><br />
-                  <small>{{ tarea.descripcion }}</small><br />
-                  <small><em>Asignados:</em> {{ tarea.trabajadores || 'Ninguno' }}</small><br />
-                  <small><em>Inicio:</em> {{ tarea.fecha_inicio }}</small><br />
-                  <small><em>Fin:</em> {{ tarea.fecha_fin }}</small>
+          <!-- 📋 Tareas -->
+          <div class="card mb-4">
+            <div class="card-header bg-secondary text-white fw-bold">📋 Tareas</div>
+            <div class="card-body">
+              <ul class="list-group mb-3">
+                <li v-for="(tarea, index) in tareas" :key="tarea.id || index"
+                  class="list-group-item d-flex justify-content-between align-items-center"
+                  :class="{ 'list-group-item-success': tarea.completada }">
+                  <div>
+                    <strong>{{ tarea.titulo }}</strong><br />
+                    <small>{{ tarea.descripcion }}</small><br />
+                    <small><em>Asignados:</em> {{ tarea.trabajadores || 'Ninguno' }}</small>
+                  </div>
+
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Acciones tarea">
+                    <button @click="toggleCompletada(tarea)"
+                      :class="tarea.completada ? 'btn btn-success' : 'btn btn-outline-secondary'"
+                      title="Marcar como completada">
+                      ✔️
+                    </button>
+                    <button @click="eliminarTarea(index)" class="btn btn-danger">🗑️</button>
+                  </div>
+                </li>
+                <li v-if="tareas.length === 0" class="list-group-item">
+                  No hay tareas registradas.
+                </li>
+              </ul>
+
+              <div class="mb-3 row g-2">
+                <div class="col">
+                  <input v-model="nuevaTarea.titulo" type="text" class="form-control"
+                    placeholder="Título de la tarea" />
                 </div>
-
-
-                <div class="btn-group btn-group-sm" role="group" aria-label="Acciones tarea">
-                  <button @click="toggleCompletada(tarea)"
-                    :class="tarea.completada ? 'btn btn-success' : 'btn btn-outline-secondary'"
-                    title="Marcar como completada">
-                    ✔️
-                  </button>
-                  <button @click="eliminarTarea(index)" class="btn btn-danger">🗑️</button>
+                <div class="col">
+                  <input v-model="nuevaTarea.descripcion" type="text" class="form-control" placeholder="Descripción" />
                 </div>
-              </li>
-              <li v-if="tareas.length === 0" class="list-group-item">
-                No hay tareas registradas.
-              </li>
-            </ul>
+                <div class="col">
+                  <input v-model="nuevaTarea.trabajadores" type="text" class="form-control"
+                    placeholder="Trabajadores (separados por coma)" />
+                </div>
+                <div class="col-auto">
+                  <button @click="agregarTarea" class="btn btn-success">➕ Añadir</button>
+                </div>
+              </div>
 
-            <div class="mb-3 row g-2">
-              <div class="col">
-                <input v-model="nuevaTarea.titulo" type="text" class="form-control" placeholder="Título de la tarea" />
-              </div>
-              <div class="col">
-                <input v-model="nuevaTarea.descripcion" type="text" class="form-control" placeholder="Descripción" />
-              </div>
-              <div class="col">
-                <input v-model="nuevaTarea.trabajadores" type="text" class="form-control"
-                  placeholder="Trabajadores (separados por coma)" />
-              </div>
-              <div class="col">
-                <input v-model="nuevaTarea.fecha_inicio" type="date" class="form-control" />
-              </div>
-              <div class="col">
-                <input v-model="nuevaTarea.fecha_fin" type="date" class="form-control" />
-              </div>
-              <div class="col-auto">
-                <button @click="agregarTarea" class="btn btn-success">➕ Añadir</button>
-              </div>
+              <button @click="guardarTareas" class="btn btn-primary">💾 Guardar Tareas</button>
             </div>
-
-            <button @click="guardarTareas" class="btn btn-primary">💾 Guardar Tareas</button>
           </div>
+
+          <!-- Fin de Tareas -->
+
         </div>
-
-        <!-- Fin de Tareas -->
-
       </div>
     </div>
-  </div>
-</template>
+  </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
@@ -381,17 +391,15 @@ const guardarCalendario = async () => {
 
 // 📋 Tareas
 const tareas = ref([])
-const nuevaTarea = ref({ titulo: '', descripcion: '', trabajadores: '', fecha_inicio: '', fecha_fin: '' })
+const nuevaTarea = ref({ titulo: '', descripcion: '', trabajadores: '' })
 
 const agregarTarea = () => {
-  const { titulo, fecha_inicio, fecha_fin } = nuevaTarea.value
-  if (!titulo) return alert('Título requerido')
-  if (!fecha_inicio || !fecha_fin) return alert('Fecha de inicio y fin son obligatorias')
-
-  tareas.value.push({ ...nuevaTarea.value, completada: false })
-  nuevaTarea.value = { titulo: '', descripcion: '', trabajadores: '', fecha_inicio: '', fecha_fin: '' }
+  if (!nuevaTarea.value.titulo) {
+    return alert('Título requerido')
+  }
+  tareas.value.push({ ...nuevaTarea.value, completada: false })  // agrego completada=false
+  nuevaTarea.value = { titulo: '', descripcion: '', trabajadores: '' }
 }
-
 
 const eliminarTarea = (index) => {
   tareas.value.splice(index, 1)
@@ -568,6 +576,57 @@ const barraColor = computed(() => {
     ? 'bg-danger' // rojo si hay pérdida
     : 'bg-success' // verde si va bien
 })
+const ingresos = ref([])
+const nuevoIngreso = ref({ descripcion: '', cantidad: 0 })
+
+const agregarIngreso = () => {
+  if (!nuevoIngreso.value.descripcion || nuevoIngreso.value.cantidad <= 0) {
+    return alert('Datos de ingreso inválidos')
+  }
+
+  ingresos.value.push({ ...nuevoIngreso.value })
+  nuevoIngreso.value = { descripcion: '', cantidad: 0 }
+}
+
+const guardarIngresos = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+
+  try {
+    const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/ingresos`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ ingresos: ingresos.value })
+    })
+
+    if (!res.ok) throw new Error()
+    alert('✅ Ingresos guardados correctamente')
+    await fetchIngresos()
+  } catch (e) {
+    console.error(e)
+    alert('❌ Error al guardar ingresos')
+  }
+}
+
+const fetchIngresos = async () => {
+  const fincaId = route.params.id
+  const token = localStorage.getItem('token')
+
+  try {
+    const res = await fetch(`http://localhost:3000/api/ingresos/${fincaId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    const data = await res.json()
+    ingresos.value = data.ingresos || []
+  } catch (e) {
+    console.error('Error al obtener ingresos:', e)
+  }
+}
+
 
 onMounted(async () => {
   await fetchFinca()
@@ -577,6 +636,7 @@ onMounted(async () => {
   await fetchGastos()             // <--- NUEVO
   await fetchUsuarioActual()
   await actualizarDineroGastado() // <--- NUEVO
+  await fetchIngresos() // 👈 Aquí
 })
 
 
