@@ -72,23 +72,20 @@ export default {
   },
   methods: {
     async handleSubmit() {
-      // Limpiar mensajes anteriores
       this.errorMessage = '';
       this.successMessage = '';
 
-      // Validar si las contraseñas coinciden
       if (this.form.password !== this.form.confirmPassword) {
         this.errorMessage = 'Las contraseñas no coinciden.';
         return;
       }
 
       try {
-        const response = await axios.post('http://localhost:3000/api/register', this.form);
+        const baseURL = import.meta.env.VITE_API_URL;
+        const response = await axios.post(`${baseURL}/api/register`, this.form);
 
-        // Si la respuesta es exitosa
         this.successMessage = response.data.message;
       } catch (error) {
-        // Manejar errores
         if (error.response) {
           this.errorMessage = error.response.data.message || 'Error en el servidor';
         } else {
@@ -99,6 +96,7 @@ export default {
   }
 };
 </script>
+
 
 <style scoped>
 /* Estilos generales */
