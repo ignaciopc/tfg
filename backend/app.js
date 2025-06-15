@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 
 const fincasRouter = require('./routes/fincas');
 const authRoutes = require('./routes/auth');
-const usuariosRouter = require('./routes/usuarios'); // <-- Importa el router de usuarios
+const usuariosRouter = require('./routes/usuarios');
 
 require('dotenv').config();
 
@@ -17,31 +17,35 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middlewares
+// CORS configurado específicamente para el frontend en Vercel
 app.use(cors({
-  origin: 'https://tfg-xi-jet.vercel.app', // tu frontend desplegado
+  origin: 'https://tfg-xi-jet.vercel.app', // URL de tu frontend desplegado
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-app.use(bodyParser.json()); // También puedes usar app.use(express.json())
+
+// Body parser
+app.use(bodyParser.json()); // O también puedes usar: app.use(express.json())
 
 // Rutas
 app.use('/api', authRoutes);
 app.use('/api/fincas', fincasRouter);
-app.use('/api/usuarios', usuariosRouter); // <-- Usa el router para usuarios con prefijo /api/usuarios
+app.use('/api/usuarios', usuariosRouter);
 
-// Manejo básico de rutas no encontradas
+// Ruta no encontrada
 app.use((req, res) => {
   res.status(404).json({ message: 'Ruta no encontrada' });
 });
 
-// Manejo básico de errores
+// Manejo de errores
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Error interno del servidor' });
 });
 
-// Iniciar servidor
+// Arrancar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+  console.log(`✅ Servidor corriendo en puerto ${PORT}`);
 });
