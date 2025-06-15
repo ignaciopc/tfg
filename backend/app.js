@@ -8,14 +8,22 @@ require('dotenv').config();
 
 const app = express();
 
-// ✅ Middleware manual para CORS
+// ✅ Middleware mejorado para CORS dinámico
+const allowedOrigins = [
+  'https://tfg-xi-jet.vercel.app',   // Frontend en producción
+  'http://localhost:5173'            // Frontend en desarrollo local
+];
+
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://tfg-xi-jet.vercel.app");
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Credentials", "true");
 
-  // Manejo de solicitudes OPTIONS (preflight)
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -24,7 +32,7 @@ app.use((req, res, next) => {
 });
 
 // ✅ Parseo de JSON
-app.use(bodyParser.json()); // O puedes usar app.use(express.json());
+app.use(bodyParser.json());
 
 // ✅ Rutas
 app.use('/api', authRoutes);

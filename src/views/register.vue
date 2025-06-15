@@ -38,7 +38,7 @@
 
         <!-- Botón de registro -->
         <button type="submit" class="submit-btn">Registrarse</button>
-        
+
       </form>
 
       <!-- Mensajes de error o éxito -->
@@ -55,6 +55,8 @@
 
 <script>
 import axios from 'axios';
+
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000'; // fallback para desarrollo
 
 export default {
   data() {
@@ -81,8 +83,16 @@ export default {
       }
 
       try {
-        const baseURL = import.meta.env.VITE_API_URL;
-        const response = await axios.post(`${baseURL}/api/register`, this.form);
+        const response = await axios.post(
+          `${baseURL}/api/register`,
+          this.form,
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            withCredentials: true
+          }
+        );
 
         this.successMessage = response.data.message;
       } catch (error) {
