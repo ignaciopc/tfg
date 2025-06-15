@@ -61,7 +61,9 @@ export default {
         async cargarTareas() {
             try {
                 const token = localStorage.getItem('token')
-                const response = await axios.get('/api/fincas/tareas-multiples', {
+                const baseURL = import.meta.env.VITE_API_URL
+
+                const response = await axios.get(`${baseURL}/api/fincas/tareas-multiples`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
 
@@ -98,7 +100,8 @@ export default {
 }
 </script>
 
-<style >
+
+<style>
 .calendar-container {
     padding-left: 10px;
     padding-right: 10px;

@@ -73,24 +73,25 @@
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-
 const usuario = ref({ nombre: '', correo: '', telefono: '' })
 const password = ref('')
 const confirmPassword = ref('')
 const mensaje = ref('')
+
+// ✅ Usamos la URL del backend desde .env
+const API_URL = import.meta.env.VITE_API_URL
 
 async function cargarDatos() {
   const token = localStorage.getItem('token')
   if (!token) return
 
   try {
-    const res = await fetch('http://localhost:3000/api/usuarios/me', {
+    const res = await fetch(`${API_URL}/api/usuarios/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw new Error('Error al obtener usuario')
@@ -129,7 +130,7 @@ async function actualizarCuenta() {
   }
 
   try {
-    const res = await fetch('http://localhost:3000/api/usuarios/guardar', {
+    const res = await fetch(`${API_URL}/api/usuarios/guardar`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -153,7 +154,7 @@ async function actualizarCuenta() {
 
 function cerrarSesion() {
   localStorage.removeItem('token')
-  router.push('/session')  // Si no usas vue-router, usa: window.location.href = '/login'
+  router.push('/session')
 }
 
 onMounted(() => {

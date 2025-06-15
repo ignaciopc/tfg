@@ -109,9 +109,11 @@ export default {
         return;
       }
 
+      const apiUrl = import.meta.env.VITE_API_URL;
+
       this.$axios
         .post(
-          '/fincas/crear',
+          `${apiUrl}/api/fincas/crear`,
           {
             nombre: this.nombre,
             tipoCultivo: this.tipoCultivo,
@@ -135,7 +137,7 @@ export default {
           const errorMessage = err.response?.data?.message || 'Error desconocido';
           alert('Error al guardar finca: ' + errorMessage);
         });
-    },
+    }
   },
 };
 </script>

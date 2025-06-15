@@ -43,16 +43,14 @@ export default {
   },
   methods: {
     async handleSubmit() {
-      this.errorMessage = ''; // Limpiar mensaje de error
+      this.errorMessage = '';
 
       try {
-        const response = await axios.post('http://localhost:3000/api/login', this.form);
+        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/login`, this.form);
 
-        // Si la respuesta es exitosa, se guarda el token
         const token = response.data.token;
         localStorage.setItem('token', token);
 
-        // Redirigir al usuario a la página /home
         this.$router.push('/home');
       } catch (error) {
         if (error.response) {
