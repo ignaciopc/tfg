@@ -10,8 +10,8 @@ const app = express();
 
 // ✅ Middleware mejorado para CORS dinámico
 const allowedOrigins = [
-  'https://tfg-xi-jet.vercel.app',   // Frontend en producción
-  'http://localhost:5173'            // Frontend en desarrollo local
+  'http://localhost:5173',
+  'https://TU_FRONTEND.vercel.app'
 ];
 
 app.use((req, res, next) => {
