@@ -1,6 +1,6 @@
 <template>
   <div class="container py-4">
-    <h2 class="mb-4 text-center">Usuarios Subordinados</h2>
+    <h2 class="mb-4 text-center">Lista Trabajadores</h2>
 
     <div v-if="loading" class="text-center">
       <div class="spinner-border text-primary" role="status">

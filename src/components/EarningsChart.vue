@@ -1,85 +1,63 @@
 <template>
-    <div>
-      <canvas ref="lineChart"></canvas>
-    </div>
-  </template>
-  
-  <script setup>
-  import { ref, onMounted } from 'vue'
-  import {
-    Chart,
-    LineElement,
-    PointElement,
-    LineController,
-    CategoryScale,
-    LinearScale,
-    Legend,
-    Tooltip,
-    Filler
-  } from 'chart.js'
-  
-  Chart.register(LineElement, PointElement, LineController, CategoryScale, LinearScale, Legend, Tooltip, Filler)
-  
-  const lineChart = ref(null)
-  
-  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio']
-  const ganancias = [500, 600, 900, 800, 400, 1000, 700]
-  const perdidas = [-200, -300, -100, -400, -500, -200, -100]
-  
-  onMounted(() => {
-    new Chart(lineChart.value, {
-      type: 'line',
-      data: {
-        labels: months,
-        datasets: [
-          {
-            label: 'Ganancias',
-            data: ganancias,
-            borderColor: 'rgba(255, 99, 132, 1)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-            tension: 0.4,
-            fill: true
-          },
-          {
-            label: 'Pérdidas',
-            data: perdidas,
-            borderColor: 'rgba(54, 162, 235, 1)',
-            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-            tension: 0.4,
-            fill: true
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          y: {
-            min: -1000, // Establecer mínimo en -1000
-            max: 1000, // Establecer máximo en 1000
-            ticks: {
-              stepSize: 100, // Aseguramos que las divisiones sean de 100 en 100
-              callback: function(value) {
-                return value + ' €'; // Añadimos el símbolo de euro a los valores
-              }
-            },
-            title: {
-              display: true,
-              text: 'Balance (€)'
-            },
-            grid: {
-              drawOnChartArea: true,
-              drawTicks: true,
-            }
-          },
-          x: {
-            title: {
-              display: true,
-              text: 'Meses'
-            }
-          }
+  <div class="chart-container">
+    <canvas ref="canvasRef"></canvas>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, watch } from 'vue'
+import {
+  Chart,
+  DoughnutController,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Title
+} from 'chart.js'
+
+Chart.register(DoughnutController, ArcElement, Tooltip, Legend, Title)
+
+const props = defineProps({
+  ganado: Number,
+  gastado: Number
+})
+
+const canvasRef = ref(null)
+let chartInstance = null
+
+const renderChart = () => {
+  if (chartInstance) chartInstance.destroy()
+
+  chartInstance = new Chart(canvasRef.value, {
+    type: 'doughnut',
+    data: {
+      labels: ['Ganado', 'Gastado'],
+      datasets: [
+        {
+          data: [props.ganado, props.gastado],
+          backgroundColor: ['#4CAF50', '#F44336']
         }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' },
+        title: { display: false }
       }
-    })
+    }
   })
-  </script>
-  
+}
+
+onMounted(renderChart)
+watch(() => [props.ganado, props.gastado], renderChart)
+</script>
+
+<style scoped>
+.chart-container {
+  width: 250px;
+  height: 250px;
+  margin: 0 auto;
+}
+</style>

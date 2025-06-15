@@ -50,7 +50,9 @@
 
               </div>
               <!-- 📈 Ingresos detallados -->
+
               <div class="mb-3">
+
                 <label class="form-label">📈 Ingresos detallados:</label>
                 <ul class="list-group mb-2">
                   <li v-for="(ingreso, index) in ingresos" :key="index"
@@ -69,9 +71,12 @@
                     placeholder="Cantidad" />
                   <button class="btn btn-outline-success" @click="agregarIngreso">➕ Añadir ingreso</button>
                 </div>
+
+                <p class="mt-2"><strong>💵 Total ganado:</strong> ${{ finca.dinero_ganado }}</p>
+
               </div>
 
-              <button @click="guardarCambios" class="btn btn-sm btn-primary">💾 Guardar todos los cambios</button>
+              <button @click="guardarTodo" class="btn btn-sm btn-primary">💾 Guardar todos los cambios</button>
 
               <p class="mt-3"><strong>Ganancia estimada:</strong> ${{ finca.dinero_ganado - finca.dinero_gastado }}</p>
               <div class="mt-3">
@@ -197,6 +202,14 @@
                   <input v-model="nuevaTarea.trabajadores" type="text" class="form-control"
                     placeholder="Trabajadores (separados por coma)" />
                 </div>
+                <div class="col">
+                  <input v-model="nuevaTarea.fecha_inicio" type="date" class="form-control"
+                    placeholder="Fecha inicio" />
+                </div>
+                <div class="col">
+                  <input v-model="nuevaTarea.fecha_fin" type="date" class="form-control" placeholder="Fecha fin" />
+                </div>
+
                 <div class="col-auto">
                   <button @click="agregarTarea" class="btn btn-success">➕ Añadir</button>
                 </div>
@@ -253,6 +266,18 @@ const guardarCambios = async () => {
     alert('❌ Error al guardar')
   }
 }
+
+const guardarTodo = async () => {
+  try {
+    await guardarCambios()      // guarda datos de la finca
+    await guardarIngresos()     // guarda ingresos detallados
+    alert('✅ Todos los cambios guardados correctamente')
+  } catch (e) {
+    console.error(e)
+    alert('❌ Error al guardar todos los cambios')
+  }
+}
+
 
 
 const fetchFinca = async () => {
@@ -579,37 +604,77 @@ const barraColor = computed(() => {
 const ingresos = ref([])
 const nuevoIngreso = ref({ descripcion: '', cantidad: 0 })
 
-const agregarIngreso = () => {
-  if (!nuevoIngreso.value.descripcion || nuevoIngreso.value.cantidad <= 0) {
-    return alert('Datos de ingreso inválidos')
-  }
-
-  ingresos.value.push({ ...nuevoIngreso.value })
-  nuevoIngreso.value = { descripcion: '', cantidad: 0 }
-}
-
-const guardarIngresos = async () => {
+const agregarIngreso = async () => {
   const fincaId = route.params.id
+  const { descripcion, cantidad } = nuevoIngreso.value
   const token = localStorage.getItem('token')
 
+  if (!descripcion || cantidad <= 0) return alert('Datos de ingreso inválidos')
+
   try {
-    const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/ingresos`, {
+    const res = await fetch('http://localhost:3000/api/fincas/' + fincaId + '/ingresos', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ ingresos: ingresos.value })
+      body: JSON.stringify({ finca_id: fincaId, descripcion, cantidad })
     })
 
-    if (!res.ok) throw new Error()
-    alert('✅ Ingresos guardados correctamente')
-    await fetchIngresos()
+    if (!res.ok) throw new Error('Error al agregar ingreso')
+
+    alert('✅ Ingreso registrado')
+
+    nuevoIngreso.value = { descripcion: '', cantidad: 0 }
+
+    await fetchIngresos() // sobrescribe el array con lo que hay realmente en DB
+    await actualizarDineroGanado();
+
   } catch (e) {
     console.error(e)
-    alert('❌ Error al guardar ingresos')
+    alert('❌ No se pudo registrar el ingreso')
   }
 }
+
+
+
+
+const guardarIngresos = async () => {
+  const fincaId = route.params.id;
+  const token = localStorage.getItem('token');
+
+  try {
+    // Solo guardar ingresos que no tengan ID (es decir, nuevos)
+    const nuevos = ingresos.value.filter(i => !i.id);
+
+    for (const ingreso of nuevos) {
+      if (!ingreso.descripcion || !ingreso.cantidad) continue;
+
+      const res = await fetch(`http://localhost:3000/api/fincas/${fincaId}/ingresos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          finca_id: fincaId,
+          descripcion: ingreso.descripcion,
+          cantidad: ingreso.cantidad
+        })
+      });
+
+      if (!res.ok) throw new Error('Error guardando ingreso');
+    }
+
+    alert('✅ Nuevos ingresos guardados correctamente');
+    await fetchIngresos(); // Refresca para obtener IDs reales
+
+  } catch (e) {
+    console.error(e);
+    alert('❌ Error al guardar ingresos');
+  }
+};
+
 
 const fetchIngresos = async () => {
   const fincaId = route.params.id
@@ -621,11 +686,13 @@ const fetchIngresos = async () => {
     })
 
     const data = await res.json()
-    ingresos.value = data.ingresos || []
+    ingresos.value = data || []
+    await actualizarDineroGanado(); // ⬅️ Aquí
   } catch (e) {
     console.error('Error al obtener ingresos:', e)
   }
 }
+
 
 
 onMounted(async () => {
@@ -633,11 +700,16 @@ onMounted(async () => {
   await fetchTrabajadores()
   await fetchCalendario()
   await fetchTareas()
-  await fetchGastos()             // <--- NUEVO
+  await fetchGastos()
   await fetchUsuarioActual()
-  await actualizarDineroGastado() // <--- NUEVO
-  await fetchIngresos() // 👈 Aquí
+  await actualizarDineroGastado()
+  await fetchIngresos()
 })
 
+
+const actualizarDineroGanado = async () => {
+  finca.value.dinero_ganado = ingresos.value.reduce((total, ingreso) => total + Number(ingreso.cantidad || 0), 0);
+  calcularProgreso();
+};
 
 </script>

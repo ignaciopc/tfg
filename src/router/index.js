@@ -11,6 +11,7 @@ import CalendarioTareas from '../views/CalendarioTareas.vue';
 import ResumenFinanzas from '../views/ResumenFinanzas.vue'; 
 import ListaUsuarios from '../views/ListaUsuarios.vue'; 
 import GenerarDocumento from '../views/GenerarDocumento.vue'; 
+import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'; 
 
 const routes = [
   {
@@ -87,6 +88,12 @@ const routes = [
     path: '/documentos/generar',
     name: 'GenerarDocumento',
     component: GenerarDocumento,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/cuenta',
+    name: 'ConfiguracionCuenta',
+    component: ConfiguracionCuenta,
     meta: { requiresAuth: true }
   },
   {

@@ -12,7 +12,7 @@
       <label>Tamaño (ha):</label>
       <input type="number" step="0.1" v-model="tamano" required />
 
-      <div id="map" style="height: 400px; margin-top: 20px;"></div>
+      <div id="map" class="map-responsive"></div>
 
       <button type="submit">Guardar Finca</button>
     </form>
@@ -40,7 +40,7 @@ export default {
     const map = L.map('map').setView([40, -3], 13);
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles © Esri'
+      attribution: 'Tiles © Esri',
     }).addTo(map);
 
     const drawnItems = new L.FeatureGroup();
@@ -82,6 +82,11 @@ export default {
     });
 
     map.addControl(searchControl);
+
+    // Fix de tamaño en móviles
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 500);
   },
   methods: {
     guardarFinca() {
@@ -90,14 +95,13 @@ export default {
         return;
       }
 
-      const coordinates = this.polygonCoords.map((coord) => [coord.lng, coord.lat]);
+      const coordinates = this.polygonCoords.map(coord => [coord.lng, coord.lat]);
       coordinates.push([this.polygonCoords[0].lng, this.polygonCoords[0].lat]);
 
       const geojson = {
         type: 'Polygon',
         coordinates: [coordinates],
       };
-      console.log('GeoJSON que se va a enviar:', JSON.stringify(geojson, null, 2));
 
       const token = localStorage.getItem('token');
       if (!token) {
@@ -105,16 +109,9 @@ export default {
         return;
       }
 
-      console.log('Enviando datos:', {
-        nombre: this.nombre,
-        tipoCultivo: this.tipoCultivo,
-        tamano: this.tamano,
-        ubicacion: geojson,
-      });
-
       this.$axios
         .post(
-          '/fincas/crear', // ✅ Ruta corregida
+          '/fincas/crear',
           {
             nombre: this.nombre,
             tipoCultivo: this.tipoCultivo,
@@ -133,8 +130,8 @@ export default {
           this.tipoCultivo = '';
           this.tamano = null;
         })
-        .catch((err) => {
-          console.log('Error completo:', err);
+        .catch(err => {
+          console.error('Error al guardar finca:', err);
           const errorMessage = err.response?.data?.message || 'Error desconocido';
           alert('Error al guardar finca: ' + errorMessage);
         });
@@ -145,12 +142,12 @@ export default {
 
 <style scoped>
 .form-container {
-  max-width: 600px;
-  margin: 30px auto;
+  max-width: 700px;
+  margin: 20px auto;
   padding: 20px;
   background: #f4f4f4;
   border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .finca-form {
@@ -165,20 +162,55 @@ export default {
 
 .finca-form input {
   padding: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
 }
 
 button {
   margin-top: 15px;
-  padding: 10px;
+  padding: 12px;
+  font-size: 16px;
   background-color: #3e7c2d;
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
+  transition: background 0.2s ease-in-out;
 }
 
 button:hover {
   background-color: #2b5b1e;
+}
+
+.map-responsive {
+  height: 400px;
+  width: 100%;
+  margin-top: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .form-container {
+    padding: 15px;
+    margin: 15px;
+  }
+
+  .map-responsive {
+    height: 300px;
+  }
+
+  .finca-form input {
+    font-size: 14px;
+  }
+
+  button {
+    font-size: 14px;
+    padding: 10px;
+  }
 }
 </style>

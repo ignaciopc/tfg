@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="grafica-wrapper">
     <Bar :data="chartData" :options="chartOptions" />
   </div>
 </template>
@@ -50,28 +50,55 @@ export default {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
+          x: {
+            ticks: {
+              autoSkip: false,
+              maxRotation: 45,
+              minRotation: 30,
+              font: {
+                size: 12,
+              },
+            },
+          },
           y: {
             beginAtZero: true,
             ticks: {
-              // Formato moneda en eje Y
-              callback: value => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value),
+              callback: value =>
+                new Intl.NumberFormat('es-ES', {
+                  style: 'currency',
+                  currency: 'EUR',
+                }).format(value),
+              font: {
+                size: 12,
+              },
             },
           },
         },
         plugins: {
           legend: {
             position: 'top',
+            labels: {
+              font: {
+                size: 12,
+              },
+            },
           },
           title: {
             display: true,
             text: 'Dinero Ganado vs Gastado por Finca',
-            font: { size: 18 },
+            font: {
+              size: 16,
+            },
           },
           tooltip: {
             callbacks: {
               label: context => {
                 const value = context.parsed.y ?? 0
-                return context.dataset.label + ': ' + new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value)
+                return `${context.dataset.label}: ` +
+                  new Intl.NumberFormat('es-ES', {
+                    style: 'currency',
+                    currency: 'EUR',
+                  }).format(value)
               },
             },
           },
@@ -83,7 +110,16 @@ export default {
 </script>
 
 <style scoped>
-div {
+.grafica-wrapper {
   height: 400px;
+  width: 100%;
+  position: relative;
+}
+
+/* Para pantallas pequeñas */
+@media (max-width: 576px) {
+  .grafica-wrapper {
+    height: 300px;
+  }
 }
 </style>

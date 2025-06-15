@@ -2,39 +2,40 @@
   <div class="listar-fincas">
     <h2>Hola, estas son tus fincas:</h2>
 
-    <!-- Botón para descargar PDF con todas las fincas -->
     <button @click="descargarPDFTodas" class="btn-todas" :disabled="fincas.length === 0">
       Descargar PDF con TODAS las fincas
     </button>
 
-    <table border="1" cellpadding="8" cellspacing="0">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Nombre</th>
-          <th>Tamaño</th>
-          <th>Tipo Cultivo</th>
-          <th>Usuario ID</th>
-          <th>Fecha Creación</th>
-          <th>Ubicación (Municipio)</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="finca in fincas" :key="finca.id">
-          <td>{{ finca.id }}</td>
-          <td>{{ finca.nombre }}</td>
-          <td>{{ finca.tamano }}</td>
-          <td>{{ finca.tipo_cultivo }}</td>
-          <td>{{ finca.usuario_id }}</td>
-          <td>{{ formatFecha(finca.fecha_creacion) }}</td>
-          <td>{{ finca.municipio || 'N/D' }}</td>
-          <td>
-            <button @click="descargarPDF(finca.id)">Generar documento</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Tamaño</th>
+            <th>Tipo Cultivo</th>
+            <th>Usuario ID</th>
+            <th>Fecha Creación</th>
+            <th>Ubicación (Municipio)</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="finca in fincas" :key="finca.id">
+            <td data-label="ID">{{ finca.id }}</td>
+            <td data-label="Nombre">{{ finca.nombre }}</td>
+            <td data-label="Tamaño">{{ finca.tamano }}</td>
+            <td data-label="Tipo Cultivo">{{ finca.tipo_cultivo }}</td>
+            <td data-label="Usuario ID">{{ finca.usuario_id }}</td>
+            <td data-label="Fecha Creación">{{ formatFecha(finca.fecha_creacion) }}</td>
+            <td data-label="Municipio">{{ finca.municipio || 'N/D' }}</td>
+            <td data-label="Acciones">
+              <button @click="descargarPDF(finca.id)">Generar documento</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -128,15 +129,29 @@ export default {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
+.table-wrapper {
+  overflow-x: auto;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
 }
 
+thead {
+  background-color: #e9ecef;
+}
+
+th, td {
+  padding: 8px;
+  text-align: left;
+  border: 1px solid #ccc;
+}
+
 button {
   cursor: pointer;
-  padding: 5px 10px;
+  padding: 6px 10px;
   background-color: #4caf50;
   border: none;
   color: white;
@@ -150,5 +165,60 @@ button:hover {
 
 .btn-todas {
   margin-bottom: 15px;
+}
+
+/* Responsive estilo "stacked table" */
+@media (max-width: 864px) {
+  table,
+  thead,
+  tbody,
+  th,
+  td,
+  tr {
+    display: block;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tr {
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px;
+    background-color: white;
+  }
+
+  td {
+    position: relative;
+    padding-left: 50%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid #eee;
+  }
+
+  td::before {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    width: 45%;
+    padding-right: 10px;
+    white-space: nowrap;
+    content: attr(data-label);
+    font-weight: bold;
+    color: #555;
+  }
+
+  .btn-todas {
+    width: 100%;
+    padding: 10px;
+    font-size: 15px;
+  }
+
+  button {
+    width: 100%;
+    margin-top: 8px;
+  }
 }
 </style>
