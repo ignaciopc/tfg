@@ -18,7 +18,10 @@ app.use((req, res, next) => {
 });
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: 'https://tfg-xi-jet.vercel.app', // tu frontend desplegado
+  credentials: true
+}));
 app.use(bodyParser.json()); // También puedes usar app.use(express.json())
 
 // Rutas
