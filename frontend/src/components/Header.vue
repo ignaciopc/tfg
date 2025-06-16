@@ -40,7 +40,6 @@
             <li class="nav-item dropdown" v-if="usuarioActual?.rol !== 'trabajador'">
               <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Finanzas</a>
               <ul class="dropdown-menu">
-                <li><router-link to="/finanzas/resumen" class="dropdown-item">Resumen de Finanzas</router-link></li>
               </ul>
             </li>
 
@@ -58,8 +57,7 @@
               <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Documentos</a>
               <ul class="dropdown-menu">
                 <li><router-link to="/documentos/generar" class="dropdown-item">Gestión de Documentos</router-link></li>
-                <li><router-link to="/documentos/vencimientos" class="dropdown-item">Control de
-                    Vencimientos</router-link></li>
+
               </ul>
             </li>
 

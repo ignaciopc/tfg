@@ -22,7 +22,7 @@
 
       <!-- Enlace a la página de registro -->
       <p class="login-link">
-        ¿No tienes una cuenta? <a href="/register">Regístrate</a>
+        ¿No tienes una cuenta?  <router-link to="/register">Registrarse</router-link>
       </p>
     </article>
   </section>

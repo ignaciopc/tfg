@@ -10,7 +10,8 @@
       <input type="text" v-model="tipoCultivo" required />
 
       <label>Tamaño (ha):</label>
-      <input type="number" step="0.1" v-model="tamano" required />
+      <!-- Solo mostrar, no editable -->
+      <input type="number" step="0.01" :value="tamano" readonly />
 
       <div id="map" class="map-responsive"></div>
 
@@ -26,13 +27,14 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { OpenStreetMapProvider, GeoSearchControl } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
+import 'leaflet-geometryutil'; // Importa para cálculo de área
 
 export default {
   data() {
     return {
       nombre: '',
       tipoCultivo: '',
-      tamano: null,
+      tamano: '0.00',  // tamano como string para mostrar con 2 decimales
       polygonCoords: null,
     };
   },
@@ -67,6 +69,13 @@ export default {
       drawnItems.clearLayers();
       drawnItems.addLayer(layer);
       this.polygonCoords = layer.getLatLngs()[0];
+
+      // Calcula área en metros cuadrados usando leaflet-geometryutil
+      const latLngs = this.polygonCoords.map(coord => L.latLng(coord.lat, coord.lng));
+      const area_m2 = L.GeometryUtil.geodesicArea(latLngs);
+
+      // Convierte a hectáreas y fija dos decimales
+      this.tamano = (area_m2 / 10000).toFixed(2);
     });
 
     const provider = new OpenStreetMapProvider();
@@ -83,7 +92,6 @@ export default {
 
     map.addControl(searchControl);
 
-    // Fix de tamaño en móviles
     setTimeout(() => {
       map.invalidateSize();
     }, 500);
@@ -95,8 +103,9 @@ export default {
         return;
       }
 
+      // Convierte coordenadas a formato GeoJSON (lng, lat)
       const coordinates = this.polygonCoords.map(coord => [coord.lng, coord.lat]);
-      coordinates.push([this.polygonCoords[0].lng, this.polygonCoords[0].lat]);
+      coordinates.push([this.polygonCoords[0].lng, this.polygonCoords[0].lat]); // cerrar polígono
 
       const geojson = {
         type: 'Polygon',
@@ -117,7 +126,7 @@ export default {
           {
             nombre: this.nombre,
             tipoCultivo: this.tipoCultivo,
-            tamano: this.tamano,
+            tamano: Number(this.tamano), // envía número
             ubicacion: geojson,
           },
           {
@@ -128,16 +137,18 @@ export default {
         )
         .then(() => {
           alert('Finca guardada con éxito');
+          // limpiar formulario
           this.nombre = '';
           this.tipoCultivo = '';
-          this.tamano = null;
+          this.tamano = '0.00';
+          this.polygonCoords = null;
         })
         .catch(err => {
           console.error('Error al guardar finca:', err);
           const errorMessage = err.response?.data?.message || 'Error desconocido';
           alert('Error al guardar finca: ' + errorMessage);
         });
-    }
+    },
   },
 };
 </script>

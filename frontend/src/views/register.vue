@@ -7,8 +7,7 @@
         <!-- Campo de nombre de usuario -->
         <div class="input-group">
           <label for="username">Nombre de usuario</label>
-          <input type="text" id="username" v-model="form.username" placeholder="Ingresa tu nombre de usuario"
-            required />
+          <input type="text" id="username" v-model="form.username" placeholder="Ingresa tu nombre de usuario" required />
         </div>
 
         <!-- Campo de correo electrónico -->
@@ -19,26 +18,41 @@
         <!-- Campo de teléfono -->
         <div class="input-group">
           <label for="telefono">Teléfono</label>
-          <input type="tel" id="telefono" v-model="form.telefono" placeholder="Ingresa tu número de teléfono"
-            required />
+          <input type="tel" id="telefono" v-model="form.telefono" placeholder="Ingresa tu número de teléfono" required />
         </div>
 
         <!-- Campo de contraseña -->
         <div class="input-group">
           <label for="password">Contraseña</label>
-          <input type="password" id="password" v-model="form.password" placeholder="Crea una contraseña" required />
+          <input
+            type="password"
+            id="password"
+            v-model="form.password"
+            placeholder="Crea una contraseña"
+            required
+          />
+          <ul v-if="form.password.length > 0" class="password-error-list">
+            <li v-for="(error, index) in passwordErrors" :key="index">
+              ⚠️ {{ error }}
+            </li>
+            <li v-if="passwordErrors.length === 0" class="valid-message">✔️ Contraseña segura</li>
+          </ul>
         </div>
 
         <!-- Campo de confirmación de contraseña -->
         <div class="input-group">
           <label for="confirmPassword">Confirmar contraseña</label>
-          <input type="password" id="confirmPassword" v-model="form.confirmPassword"
-            placeholder="Confirma tu contraseña" required />
+          <input
+            type="password"
+            id="confirmPassword"
+            v-model="form.confirmPassword"
+            placeholder="Confirma tu contraseña"
+            required
+          />
         </div>
 
         <!-- Botón de registro -->
         <button type="submit" class="submit-btn">Registrarse</button>
-
       </form>
 
       <!-- Mensajes de error o éxito -->
@@ -69,13 +83,36 @@ export default {
         confirmPassword: ''
       },
       errorMessage: '',
-      successMessage: ''
+      successMessage: '',
+      passwordErrors: []
     };
   },
+  watch: {
+    'form.password'(newVal) {
+      this.passwordErrors = this.validarPassword(newVal);
+    }
+  },
   methods: {
+    validarPassword(password) {
+      const errores = [];
+
+      if (password.length < 8) errores.push('mínimo 8 caracteres');
+      if (!/[A-Z]/.test(password)) errores.push('al menos una letra mayúscula');
+      if (!/[a-z]/.test(password)) errores.push('al menos una letra minúscula');
+      if (!/\d/.test(password)) errores.push('al menos un número');
+      if (!/[@$!%*?&]/.test(password)) errores.push('al menos un símbolo (@$!%*?&)');
+
+      return errores;
+    },
+
     async handleSubmit() {
       this.errorMessage = '';
       this.successMessage = '';
+
+      if (this.passwordErrors.length > 0) {
+        this.errorMessage = 'La contraseña no cumple con los requisitos.';
+        return;
+      }
 
       if (this.form.password !== this.form.confirmPassword) {
         this.errorMessage = 'Las contraseñas no coinciden.';
@@ -83,6 +120,7 @@ export default {
       }
 
       try {
+        // Registro
         const response = await axios.post(
           `${baseURL}/api/register`,
           this.form,
@@ -95,6 +133,27 @@ export default {
         );
 
         this.successMessage = response.data.message;
+
+        // Login automático justo después
+        const loginResponse = await axios.post(
+          `${baseURL}/api/login`,
+          {
+            email: this.form.email,
+            password: this.form.password
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            withCredentials: true
+          }
+        );
+
+        // Guardar token y redirigir
+        const token = loginResponse.data.token;
+        localStorage.setItem('token', token);
+
+        this.$router.push('/home'); // O a la ruta que quieras
       } catch (error) {
         if (error.response) {
           this.errorMessage = error.response.data.message || 'Error en el servidor';
@@ -106,7 +165,6 @@ export default {
   }
 };
 </script>
-
 
 <style scoped>
 /* Estilos generales */
@@ -212,5 +270,16 @@ input:focus {
   font-size: 14px;
   margin-top: 10px;
   text-align: center;
+}
+
+.password-error-list {
+  margin-top: 6px;
+  padding-left: 20px;
+  color: #d9534f; /* rojo */
+  font-size: 13px;
+}
+
+.password-error-list li.valid-message {
+  color: #5cb85c; /* verde */
 }
 </style>
