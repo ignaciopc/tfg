@@ -105,7 +105,7 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/register'
+    redirect: '/home'
   }
 ]
 

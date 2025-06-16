@@ -898,10 +898,60 @@ router.get('/fincas/:id/pdf', async (req, res) => {
     const trabajadores = trabajadoresResult.rows;
     const trabajadoresCount = trabajadores.length;
 
-    // 5. Sumar total gastos
+    // 5. Obtener producciones con rendimiento
+    const produccionesResult = await pool.query(
+      `SELECT
+        p.id AS produccion_id,
+        p.descripcion,
+        p.tipo,
+        p.fecha_inicio,
+        p.fecha_fin,
+        p.cantidad AS produccion,
+
+        (
+          SELECT COALESCE(SUM(g.cantidad), 0)
+          FROM gastos g
+          WHERE g.finca_id = p.finca_id
+            AND g.fecha >= p.fecha_inicio
+            AND g.fecha <= p.fecha_fin
+        ) AS total_gastos,
+
+        (
+          SELECT COALESCE(SUM(i.cantidad), 0)
+          FROM ingresos i
+          WHERE i.finca_id = p.finca_id
+            AND i.creado_en::date >= p.fecha_inicio
+            AND i.creado_en::date <= p.fecha_fin
+        ) AS total_ingresos,
+
+        (
+          (
+            SELECT COALESCE(SUM(i.cantidad), 0)
+            FROM ingresos i
+            WHERE i.finca_id = p.finca_id
+              AND i.creado_en::date >= p.fecha_inicio
+              AND i.creado_en::date <= p.fecha_fin
+          ) -
+          (
+            SELECT COALESCE(SUM(g.cantidad), 0)
+            FROM gastos g
+            WHERE g.finca_id = p.finca_id
+              AND g.fecha >= p.fecha_inicio
+              AND g.fecha <= p.fecha_fin
+          )
+        ) AS rendimiento
+
+      FROM producciones p
+      WHERE p.finca_id = $1
+      ORDER BY p.fecha_inicio DESC`,
+      [fincaId]
+    );
+    const producciones = produccionesResult.rows;
+
+    // 6. Sumar total gastos para gráfico
     const totalGastos = gastos.reduce((sum, gasto) => sum + Number(gasto.cantidad || 0), 0);
 
-    // 6. Crear configuración del gráfico
+    // 7. Configuración gráfico
     const config = {
       type: 'bar',
       data: {
@@ -935,10 +985,10 @@ router.get('/fincas/:id/pdf', async (req, res) => {
       },
     };
 
-    // 7. Renderizar gráfico a imagen (buffer)
+    // 8. Renderizar gráfico a imagen (buffer)
     const imageBuffer = await chartJSNodeCanvas.renderToBuffer(config);
 
-    // 8. Crear PDF y enviar
+    // 9. Crear PDF y enviar
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -946,7 +996,7 @@ router.get('/fincas/:id/pdf', async (req, res) => {
 
     doc.pipe(res);
 
-    // 9. Título principal
+    // Título principal
     doc
       .font('Helvetica-Bold')
       .fontSize(26)
@@ -954,7 +1004,7 @@ router.get('/fincas/:id/pdf', async (req, res) => {
       .text(`Informe finca: ${finca.nombre}`, { align: 'center' })
       .moveDown(1.5);
 
-    // 10. Información básica finca con tamaño mayor y color
+    // Información básica finca
     doc
       .font('Helvetica-Bold')
       .fontSize(14)
@@ -968,7 +1018,7 @@ router.get('/fincas/:id/pdf', async (req, res) => {
       .fillColor('#000')
       .text(`ID: ${finca.id}`)
       .text(`Nombre: ${finca.nombre}`)
-      .text(`Tamaño: ${finca.tamano}`)
+      .text(`Tamaño: ${finca.tamano} ha`)
       .text(`Tipo de Cultivo: ${finca.tipo_cultivo}`)
       .text(`Usuario ID: ${finca.usuario_id}`)
       .text(`Fecha de Creación: ${new Date(finca.fecha_creacion).toLocaleDateString()}`)
@@ -977,7 +1027,7 @@ router.get('/fincas/:id/pdf', async (req, res) => {
       .text(`Dinero Ganado: €${(Number(finca.dinero_ganado) || 0).toFixed(2)}`)
       .moveDown(1);
 
-    // 11. Trabajadores con estilo
+    // Trabajadores
     doc
       .font('Helvetica-Bold')
       .fontSize(16)
@@ -996,7 +1046,7 @@ router.get('/fincas/:id/pdf', async (req, res) => {
     }
     doc.moveDown(1);
 
-    // 12. Gastos detallados
+    // Gastos detallados
     doc
       .font('Helvetica-Bold')
       .fontSize(16)
@@ -1016,7 +1066,7 @@ router.get('/fincas/:id/pdf', async (req, res) => {
     }
     doc.moveDown(1);
 
-    // 13. Ingresos detallados
+    // Ingresos detallados
     doc
       .font('Helvetica-Bold')
       .fontSize(16)
@@ -1036,8 +1086,46 @@ router.get('/fincas/:id/pdf', async (req, res) => {
     }
     doc.moveDown(1);
 
-    // 14. Insertar gráfico con un borde y centrado
+    // RENDIMIENTO DE PRODUCCIONES
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(18)
+      .fillColor('#2E8B57')
+      .text('Rendimiento de Producciones', { underline: true, align: 'center' })
+      .moveDown(1);
+
+    if (producciones.length === 0) {
+      doc.font('Helvetica').fontSize(14).text('No hay producciones registradas.', { align: 'center' });
+    } else {
+      producciones.forEach(p => {
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(14)
+          .fillColor('#4B4B4B')
+          .text(`${p.descripcion} (${new Date(p.fecha_inicio).toLocaleDateString()} → ${new Date(p.fecha_fin).toLocaleDateString()})`)
+          .moveDown(0.2);
+
+        doc.font('Helvetica').fontSize(13).fillColor('#000');
+        doc.text(`Producción: ${p.produccion} unidades`);
+        doc.text(`Gastos: €${Number(p.total_gastos).toFixed(2)}`);
+        doc.text(`Ingresos: €${Number(p.total_ingresos).toFixed(2)}`);
+        doc.text(`Rendimiento: €${Number(p.rendimiento).toFixed(2)}`);
+        doc.moveDown(0.7);
+
+        doc
+          .strokeColor('#ccc')
+          .lineWidth(0.5)
+          .moveTo(doc.x, doc.y)
+          .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+          .stroke();
+
+        doc.moveDown(0.7);
+      });
+    }
+
+    // --- GRÁFICO AL FINAL ---
     const graphX = (doc.page.width - 500) / 2;
+    doc.moveDown(1.5);
     doc
       .rect(graphX - 10, doc.y - 10, 520, 320)
       .strokeColor('#ddd')
@@ -1059,10 +1147,8 @@ router.get('/fincas/:id/pdf', async (req, res) => {
 
 
 
-// ---------------- OBTENER PDF CON TODAS LAS FINCAS ----------------
 router.get('/fincas/pdf/todas', async (req, res) => {
   try {
-    // 1. Obtener todas las fincas
     const fincasResult = await pool.query(
       `SELECT id, nombre, tamano, tipo_cultivo, usuario_id, fecha_creacion, 
               objetivo_ingresos, dinero_gastado, dinero_ganado
@@ -1074,43 +1160,96 @@ router.get('/fincas/pdf/todas', async (req, res) => {
       return res.status(404).json({ message: 'No hay fincas para generar PDF' });
     }
 
-    // 2. Crear PDF
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
-
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=fincas_todas.pdf');
-
     doc.pipe(res);
 
     for (let i = 0; i < fincas.length; i++) {
       const finca = fincas[i];
 
-      // Obtener gastos detallados
+      // Si no es la primera finca, añadir página nueva
+      if (i > 0) doc.addPage();
+
+      // Función para verificar espacio y añadir página si es necesario
+      const checkSpace = (neededHeight) => {
+        if (doc.y + neededHeight > doc.page.height - doc.page.margins.bottom) {
+          doc.addPage();
+        }
+      };
+
+      // Datos detallados (gastos, ingresos, trabajadores, producciones)
       const gastosResult = await pool.query(
         `SELECT descripcion, cantidad, fecha FROM gastos WHERE finca_id = $1 ORDER BY fecha`,
         [finca.id]
       );
       const gastos = gastosResult.rows;
 
-      // Obtener ingresos detallados
       const ingresosResult = await pool.query(
         `SELECT descripcion, cantidad, creado_en FROM ingresos WHERE finca_id = $1 ORDER BY creado_en`,
         [finca.id]
       );
       const ingresos = ingresosResult.rows;
 
-      // Obtener trabajadores detallados (nombre, sueldo)
       const trabajadoresResult = await pool.query(
         `SELECT nombre, sueldo FROM trabajadores WHERE finca_id = $1 ORDER BY nombre`,
         [finca.id]
       );
       const trabajadores = trabajadoresResult.rows;
-      const trabajadoresCount = trabajadores.length;
+
+      const produccionesResult = await pool.query(
+        `SELECT
+          p.id AS produccion_id,
+          p.descripcion,
+          p.tipo,
+          p.fecha_inicio,
+          p.fecha_fin,
+          p.cantidad AS produccion,
+
+          (
+            SELECT COALESCE(SUM(g.cantidad), 0)
+            FROM gastos g
+            WHERE g.finca_id = p.finca_id
+              AND g.fecha >= p.fecha_inicio
+              AND g.fecha <= p.fecha_fin
+          ) AS total_gastos,
+
+          (
+            SELECT COALESCE(SUM(i.cantidad), 0)
+            FROM ingresos i
+            WHERE i.finca_id = p.finca_id
+              AND i.creado_en::date >= p.fecha_inicio
+              AND i.creado_en::date <= p.fecha_fin
+          ) AS total_ingresos,
+
+          (
+            (
+              SELECT COALESCE(SUM(i.cantidad), 0)
+              FROM ingresos i
+              WHERE i.finca_id = p.finca_id
+                AND i.creado_en::date >= p.fecha_inicio
+                AND i.creado_en::date <= p.fecha_fin
+            ) -
+            (
+              SELECT COALESCE(SUM(g.cantidad), 0)
+              FROM gastos g
+              WHERE g.finca_id = p.finca_id
+                AND g.fecha >= p.fecha_inicio
+                AND g.fecha <= p.fecha_fin
+            )
+          ) AS rendimiento
+
+        FROM producciones p
+        WHERE p.finca_id = $1
+        ORDER BY p.fecha_inicio DESC`,
+        [finca.id]
+      );
+      const producciones = produccionesResult.rows;
 
       // Sumar total gastos
       const totalGastos = gastos.reduce((sum, gasto) => sum + Number(gasto.cantidad || 0), 0);
 
-      // Configuración gráfico
+      // Config gráfico
       const config = {
         type: 'bar',
         data: {
@@ -1133,21 +1272,13 @@ router.get('/fincas/pdf/todas', async (req, res) => {
             },
           },
           scales: {
-            y: {
-              beginAtZero: true,
-              ticks: { font: { size: 14 } }
-            },
-            x: {
-              ticks: { font: { size: 14 } }
-            }
+            y: { beginAtZero: true, ticks: { font: { size: 14 } } },
+            x: { ticks: { font: { size: 14 } } }
           },
         },
       };
 
       const imageBuffer = await chartJSNodeCanvas.renderToBuffer(config);
-
-      // Agregar página nueva excepto la primera
-      if (i > 0) doc.addPage();
 
       // Título principal finca
       doc
@@ -1157,7 +1288,7 @@ router.get('/fincas/pdf/todas', async (req, res) => {
         .text(`Informe finca: ${finca.nombre}`, { align: 'center' })
         .moveDown(1.5);
 
-      // Información general
+      // Info general
       doc
         .font('Helvetica-Bold')
         .fontSize(14)
@@ -1165,89 +1296,105 @@ router.get('/fincas/pdf/todas', async (req, res) => {
         .text('Información General', { underline: true })
         .moveDown(0.7);
 
-      doc
-        .font('Helvetica')
-        .fontSize(13)
-        .fillColor('#000')
-        .text(`ID: ${finca.id}`)
-        .text(`Nombre: ${finca.nombre}`)
-        .text(`Tamaño: ${finca.tamano}`)
-        .text(`Tipo de Cultivo: ${finca.tipo_cultivo}`)
-        .text(`Usuario ID: ${finca.usuario_id}`)
-        .text(`Fecha de Creación: ${new Date(finca.fecha_creacion).toLocaleDateString()}`)
-        .text(`Objetivo de Ingresos: €${(Number(finca.objetivo_ingresos) || 0).toFixed(2)}`)
-        .text(`Dinero Gastado (tabla fincas): €${(Number(finca.dinero_gastado) || 0).toFixed(2)}`)
-        .text(`Dinero Ganado: €${(Number(finca.dinero_ganado) || 0).toFixed(2)}`)
-        .moveDown(1);
+      const infoLines = [
+        `ID: ${finca.id}`,
+        `Nombre: ${finca.nombre}`,
+        `Tamaño: ${finca.tamano} ha`,
+        `Tipo de Cultivo: ${finca.tipo_cultivo}`,
+        `Usuario ID: ${finca.usuario_id}`,
+        `Fecha de Creación: ${new Date(finca.fecha_creacion).toLocaleDateString()}`,
+        `Objetivo de Ingresos: €${(Number(finca.objetivo_ingresos) || 0).toFixed(2)}`,
+        `Dinero Gastado (tabla fincas): €${(Number(finca.dinero_gastado) || 0).toFixed(2)}`,
+        `Dinero Ganado: €${(Number(finca.dinero_ganado) || 0).toFixed(2)}`,
+      ];
+
+      infoLines.forEach(line => {
+        checkSpace(20);
+        doc.font('Helvetica').fontSize(13).fillColor('#000').text(line);
+      });
+      doc.moveDown(1);
 
       // Trabajadores
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(16)
-        .fillColor('#4B4B4B')
-        .text(`Trabajadores (${trabajadoresCount}):`, { underline: true })
-        .moveDown(0.5);
-
-      doc.font('Helvetica').fontSize(13).fillColor('#000');
-      if (trabajadoresCount === 0) {
-        doc.text('No hay trabajadores registrados.');
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#4B4B4B').text(`Trabajadores (${trabajadores.length}):`, { underline: true }).moveDown(0.5);
+      if (trabajadores.length === 0) {
+        checkSpace(20);
+        doc.font('Helvetica').fontSize(13).fillColor('#000').text('No hay trabajadores registrados.');
       } else {
         trabajadores.forEach(t => {
+          checkSpace(20);
           const sueldoStr = t.sueldo ? ` - Sueldo: €${Number(t.sueldo).toFixed(2)}` : '';
-          doc.text(`- ${t.nombre}${sueldoStr}`);
+          doc.font('Helvetica').fontSize(13).fillColor('#000').text(`- ${t.nombre}${sueldoStr}`);
         });
       }
       doc.moveDown(1);
 
       // Gastos detallados
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(16)
-        .fillColor('#4B4B4B')
-        .text('Gastos detallados:', { underline: true })
-        .moveDown(0.5);
-
-      doc.font('Helvetica').fontSize(13).fillColor('#000');
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#4B4B4B').text('Gastos detallados:', { underline: true }).moveDown(0.5);
       if (gastos.length === 0) {
-        doc.text('No hay gastos registrados para esta finca.');
+        checkSpace(20);
+        doc.font('Helvetica').fontSize(13).fillColor('#000').text('No hay gastos registrados para esta finca.');
       } else {
         gastos.forEach(gasto => {
+          checkSpace(20);
           const fecha = new Date(gasto.fecha).toLocaleDateString();
           const cantidad = Number(gasto.cantidad) || 0;
-          doc.text(`- ${fecha}: ${gasto.descripcion} - €${cantidad.toFixed(2)}`);
+          doc.font('Helvetica').fontSize(13).fillColor('#000').text(`- ${fecha}: ${gasto.descripcion} - €${cantidad.toFixed(2)}`);
         });
       }
       doc.moveDown(1);
 
       // Ingresos detallados
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(16)
-        .fillColor('#4B4B4B')
-        .text('Ingresos detallados:', { underline: true })
-        .moveDown(0.5);
-
-      doc.font('Helvetica').fontSize(13).fillColor('#000');
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#4B4B4B').text('Ingresos detallados:', { underline: true }).moveDown(0.5);
       if (ingresos.length === 0) {
-        doc.text('No hay ingresos registrados para esta finca.');
+        checkSpace(20);
+        doc.font('Helvetica').fontSize(13).fillColor('#000').text('No hay ingresos registrados para esta finca.');
       } else {
         ingresos.forEach(ingreso => {
+          checkSpace(20);
           const fecha = new Date(ingreso.creado_en).toLocaleDateString();
           const cantidad = Number(ingreso.cantidad) || 0;
-          doc.text(`- ${fecha}: ${ingreso.descripcion} - €${cantidad.toFixed(2)}`);
+          doc.font('Helvetica').fontSize(13).fillColor('#000').text(`- ${fecha}: ${ingreso.descripcion} - €${cantidad.toFixed(2)}`);
         });
       }
       doc.moveDown(1);
 
-      // Insertar gráfico con borde y centrado
+      // Rendimiento producciones
+      doc.font('Helvetica-Bold').fontSize(18).fillColor('#2E8B57').text('Rendimiento de Producciones', { underline: true, align: 'center' }).moveDown(1);
+      if (producciones.length === 0) {
+        checkSpace(30);
+        doc.font('Helvetica').fontSize(14).text('No hay producciones registradas.', { align: 'center' });
+      } else {
+        producciones.forEach(p => {
+          checkSpace(70); // espacio para el bloque de texto
+          doc.font('Helvetica-Bold').fontSize(14).fillColor('#4B4B4B')
+            .text(`${p.descripcion} (${new Date(p.fecha_inicio).toLocaleDateString()} → ${new Date(p.fecha_fin).toLocaleDateString()})`)
+            .moveDown(0.2);
+          doc.font('Helvetica').fontSize(13).fillColor('#000');
+          doc.text(`Producción: ${p.produccion} unidades`);
+          doc.text(`Gastos: €${Number(p.total_gastos).toFixed(2)}`);
+          doc.text(`Ingresos: €${Number(p.total_ingresos).toFixed(2)}`);
+          doc.text(`Rendimiento: €${Number(p.rendimiento).toFixed(2)}`);
+          doc.moveDown(0.7);
+
+          // Línea separadora
+          checkSpace(20);
+          doc.strokeColor('#ccc').lineWidth(0.5).moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
+          doc.moveDown(0.7);
+        });
+      }
+
+      // Mover gráfico al final con suficiente espacio
+      checkSpace(350);
       const graphX = (doc.page.width - 500) / 2;
       doc
         .rect(graphX - 10, doc.y - 10, 520, 320)
         .strokeColor('#ddd')
         .lineWidth(1)
         .stroke();
-
       doc.image(imageBuffer, graphX, doc.y, { fit: [500, 300], align: 'center' });
+
+      // Finalmente, move down para evitar solapamientos en siguiente ciclo
+      doc.moveDown(2);
     }
 
     doc.end();

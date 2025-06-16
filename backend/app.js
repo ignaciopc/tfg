@@ -1,6 +1,6 @@
-// app.js
 const express = require('express');
 const bodyParser = require('body-parser');
+const helmet = require('helmet'); // Importar helmet
 const fincasRouter = require('./routes/fincas');
 const authRoutes = require('./routes/auth');
 const usuariosRouter = require('./routes/usuarios');
@@ -8,12 +8,15 @@ require('dotenv').config();
 
 const app = express();
 
+// ✅ Seguridad: usar helmet para cabeceras HTTP seguras
+app.use(helmet());
+
 // ✅ Middleware mejorado para CORS dinámico
 const allowedOrigins = [
   'https://tfg-xi-jet.vercel.app',
   'http://localhost:5173',
   'https://proyecto-final-grado-alpha.vercel.app',
-  'https://ignaciopc.github.io'  // <--- Aquí tu dominio GitHub Pages
+  'https://ignaciopc.github.io'  // Tu dominio GitHub Pages
 ];
 
 app.use((req, res, next) => {
