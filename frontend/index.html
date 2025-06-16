@@ -1,13 +1,31 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mi Proyecto</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Favicon clásico -->
+  <link rel="icon" href="/favicon_multi.ico" type="image/x-icon" />
+
+  <!-- Íconos para móviles y PWA -->
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+
+  <!-- Manifest PWA -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- PWA + colores -->
+  <meta name="theme-color" content="#6B8E23" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <title>Gestión de Fincas</title>
+</head>
+
+
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
 </html>

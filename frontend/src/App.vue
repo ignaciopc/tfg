@@ -1,22 +1,24 @@
-
 <template>
-  <div id="app">
+  <div id="app" class="d-flex flex-column min-vh-100">
     <Header />
-    <router-view></router-view> 
+    <router-view />
+    <Footer />
   </div>
 </template>
 
 <script>
-import Header from './components/Header.vue';  // Asegúrate de importar el componente
+import Header from './components/Header.vue'
+import Footer from './components/Footer.vue'  
 
 export default {
   name: 'App',
   components: {
-    Header  // Agregar el componente Header al layout principal
+    Header,
+    Footer  // ✅ Añadir el componente aquí también
   }
-};
+}
 </script>
 
 <style>
-/* Aquí puedes agregar estilos globales si lo deseas */
+/* Estilos globales opcionales */
 </style>
