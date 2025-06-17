@@ -1,3 +1,15 @@
 body{
   background-color: #F4F1EB;
 }
+body {
+  font-family: 'Open Sans', sans-serif;
+  font-size: 16px;
+  color: #333;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #2E8B57; /* Verde oliva, para mantener la coherencia visual */
+}
