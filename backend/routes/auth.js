@@ -91,7 +91,6 @@ router.post('/fincas/crear', async (req, res) => {
     res.status(500).json({ message: 'Error interno al crear finca.' });
   }
 });
-
 // ---------------- LISTAR FINCAS CON GEOMETRÍA Y DATOS ECONÓMICOS ----------------
 router.get('/fincas/lista', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -145,12 +144,20 @@ router.get('/fincas/lista', async (req, res) => {
       let municipio = 'Desconocido';
       try {
         const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
-          params: { lat, lon, format: 'json', addressdetails: 1 }
+          headers: {
+            'User-Agent': 'FincasApp/1.0 (ignacio78787@gmail.com)' // <-- cambia esto por tu email real o dominio
+          },
+          params: {
+            lat,
+            lon,
+            format: 'json',
+            addressdetails: 1
+          }
         });
         const addr = response.data.address;
         municipio = addr.city || addr.town || addr.village || addr.municipality || municipio;
       } catch (e) {
-        // dejamos municipio como 'Desconocido'
+        console.error(`❌ Error al obtener municipio para finca ID ${finca.id}:`, e.message);
       }
 
       return {
@@ -176,6 +183,7 @@ router.get('/fincas/lista', async (req, res) => {
     res.status(500).json({ message: 'Error del servidor.' });
   }
 });
+
 
 // ---------------- ELIMINAR FINCA ----------------
 router.delete('/fincas/:id', async (req, res) => {
